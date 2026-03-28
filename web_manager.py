@@ -474,8 +474,8 @@ def api_health() -> Response:
 
 @app.get("/api/auth/check")
 def api_auth_check() -> Response:
-  # Si el request llega aqui, el token ya fue validado en before_request.
-  return jsonify({"ok": True})
+    # Si el request llega aqui, el token ya fue validado en before_request.
+    return jsonify({"ok": True})
 
 
 @app.post("/api/tenant/create")
