@@ -20,7 +20,10 @@ RAM_USED_MB=$(free -m | awk 'NR==2{print $3}')
 SWAP_TOTAL_MB=$(free -m | awk 'NR==3{print $2}')
 SWAP_USED_MB=$(free -m | awk 'NR==3{print $3}')
 
-CONTAINERS_RUNNING=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -v -E "$EXCLUDE_CONTAINER_REGEX" | wc -l | tr -d ' ')
+if ! CONTAINERS_RUNNING=$(docker ps --format '{{.Names}}' 2>/dev/null | awk -v re="${EXCLUDE_CONTAINER_REGEX:-^$}" 'NF && $0 !~ re {count++} END {print count+0}'); then
+    # Si docker no esta disponible o falla, devolvemos 0 para no romper el snapshot.
+    CONTAINERS_RUNNING=0
+fi
 
 DATABASES_RAW=$(sudo -u postgres psql -t -A -c "SELECT datname FROM pg_database WHERE datname LIKE '${DB_NAME_PREFIX}_%';" 2>/dev/null || true)
 DOCKER_STATS_RAW=$(docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.PIDs}}' 2>/dev/null || true)
