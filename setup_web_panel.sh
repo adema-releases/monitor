@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# Adema Core - Web panel installer
+# Repo oficial: https://github.com/adema-releases/adema-core
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_USER="adema"
@@ -18,7 +20,7 @@ fi
 
 if command -v apt-get >/dev/null 2>&1; then
     apt-get update
-    apt-get install -y python3 python3-venv python3-pip sudo
+    apt-get install -y python3 python3-venv python3-pip sudo ufw
 else
     echo "Error: este instalador soporta Debian/Ubuntu (apt-get)."
     exit 1
@@ -51,7 +53,39 @@ chmod 640 "$ENV_FILE"
 
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install flask
+"$VENV_DIR/bin/pip" install flask flask-limiter
+
+if command -v ufw >/dev/null 2>&1; then
+    UFW_STATUS=$(ufw status | head -n1 || true)
+    if echo "$UFW_STATUS" | grep -qi "inactive"; then
+        ufw allow OpenSSH >/dev/null 2>&1 || true
+        ufw --force enable >/dev/null
+    fi
+
+    add_ufw_rule_if_missing() {
+        local expected="$1"
+        shift
+        if ! ufw status | grep -Fq "$expected"; then
+            ufw "$@" >/dev/null
+        fi
+    }
+
+    remove_ufw_open_5432_anywhere() {
+        local line_num
+        while true; do
+            line_num=$(ufw status numbered | awk '/5432\/tcp/ && /ALLOW IN/ && /Anywhere/ {gsub(/\[|\]/, "", $1); print $1; exit}')
+            [ -n "$line_num" ] || break
+            ufw --force delete "$line_num" >/dev/null
+        done
+    }
+
+    remove_ufw_open_5432_anywhere
+
+    add_ufw_rule_if_missing "5432/tcp                   ALLOW IN    10.0.0.0/8" allow from 10.0.0.0/8 to any port 5432 proto tcp
+    add_ufw_rule_if_missing "5432/tcp                   ALLOW IN    172.16.0.0/12" allow from 172.16.0.0/12 to any port 5432 proto tcp
+    add_ufw_rule_if_missing "5432/tcp                   ALLOW IN    192.168.0.0/16" allow from 192.168.0.0/16 to any port 5432 proto tcp
+    add_ufw_rule_if_missing "5432/tcp                   DENY IN     Anywhere" deny in to any port 5432 proto tcp
+fi
 
 chown -R "$WEB_USER":"$WEB_GROUP" "$VENV_DIR"
 chown "$WEB_USER":"$WEB_GROUP" "$ROOT_DIR/web_manager.py"

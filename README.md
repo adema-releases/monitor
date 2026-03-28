@@ -1,4 +1,6 @@
-# Adema Core Django Multi-Proyecto
+# Adema Core
+
+Repositorio oficial: https://github.com/adema-releases/adema-core
 
 Este repositorio contiene scripts Bash para operar y monitorear multiples proyectos Django desplegados en contenedores.
 

@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+"""Adema Core web manager.
+
+Repo oficial: https://github.com/adema-releases/adema-core
+"""
+
 import hmac
 import json
+import logging
 import os
 import re
+import secrets
 import shutil
 import threading
 import uuid
@@ -14,6 +21,8 @@ from subprocess import PIPE, STDOUT, Popen, TimeoutExpired, run
 from typing import Dict, List, Optional
 
 from flask import Flask, jsonify, request, Response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -45,6 +54,17 @@ if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
 
 app = Flask(__name__)
+logging.basicConfig(
+    level=os.getenv("ADEMA_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=os.getenv("ADEMA_RATE_LIMIT_STORAGE", "memory://"),
+)
 
 
 @dataclass
@@ -88,9 +108,16 @@ def validate_token() -> Optional[Response]:
     if provided and hmac.compare_digest(provided, TOKEN):
         return None
 
+    app.logger.warning("Intento no autorizado a %s desde ip=%s", request.path, request.remote_addr)
     if request.path.startswith("/api/"):
         return jsonify({"error": "unauthorized"}), 401
     return Response("Unauthorized", status=401)
+
+
+@app.errorhandler(429)
+def handle_rate_limit(_exc: Exception) -> Response:
+    app.logger.warning("Rate limit excedido en %s desde ip=%s", request.path, request.remote_addr)
+    return jsonify({"error": "too_many_requests", "message": "Rate limit excedido"}), 429
 
 
 def _run_snapshot() -> dict:
@@ -119,15 +146,15 @@ def _run_snapshot() -> dict:
 def _can_run_delete_without_password() -> bool:
     # Valida que el usuario del servicio pueda ejecutar delete_tenant.sh via sudo sin password.
     # Evitamos encolar un job que sabemos que fallara por permisos.
-  cmd = ["sudo", "-n", "-l"]
-  result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=6)
-  if result.returncode != 0:
-    return False
+    cmd = ["sudo", "-n", "-l"]
+    result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=6)
+    if result.returncode != 0:
+        return False
 
-  listing = f"{result.stdout}\n{result.stderr}"
-  script_path = re.escape(str(DELETE_SCRIPT))
-  rule_re = rf"NOPASSWD:\s*/bin/bash\s+{script_path}(?:\s+\*)?"
-  return re.search(rule_re, listing) is not None
+    listing = f"{result.stdout}\n{result.stderr}"
+    script_path = re.escape(str(DELETE_SCRIPT))
+    rule_re = rf"NOPASSWD:\s*/bin/bash\s+{script_path}(?:\s+\*)?"
+    return re.search(rule_re, listing) is not None
 
 
 def _load_trash_items_unlocked() -> List[dict]:
@@ -281,28 +308,42 @@ def _ensure_password(password: str) -> str:
     return value
 
 
-def _enqueue_job(action: str, command: List[str]) -> Job:
+def _redact_command(command: List[str]) -> List[str]:
+    redacted = list(command)
+    if len(redacted) >= 4 and redacted[0:3] == ["sudo", "-n", "/bin/bash"]:
+        script_name = Path(redacted[3]).name
+        if script_name in {"create_tenant.sh", "test_tenant_db.sh"} and len(redacted) >= 6:
+            redacted[5] = "***REDACTED***"
+    return redacted
+
+
+def _generate_db_password() -> str:
+    # 24 chars URL-safe y compatible con DB_PASSWORD_RE.
+    return secrets.token_urlsafe(18).replace("-", "A").replace("_", "B")[:24]
+
+
+def _enqueue_job(action: str, command: List[str], safe_command: Optional[List[str]] = None) -> Job:
     job_id = uuid.uuid4().hex[:12]
     log_path = JOBS_DIR / f"{job_id}.log"
     now = datetime.now(timezone.utc).isoformat()
     job = Job(
         id=job_id,
-      action=f"Adema Core | {action}",
+        action=f"Adema Core | {action}",
         created_at=now,
         status="queued",
         return_code=None,
-        command=command,
+        command=safe_command or _redact_command(command),
         log_path=str(log_path),
     )
 
     with jobs_lock:
         jobs[job_id] = job
 
-    _executor.submit(_run_job_worker, job_id)
+    _executor.submit(_run_job_worker, job_id, command)
     return job
 
 
-def _run_job_worker(job_id: str) -> None:
+def _run_job_worker(job_id: str, exec_command: List[str]) -> None:
     with jobs_lock:
         job = jobs.get(job_id)
     if not job:
@@ -313,29 +354,29 @@ def _run_job_worker(job_id: str) -> None:
 
     log_file = Path(job.log_path)
     try:
-      with log_file.open("w", encoding="utf-8") as lf:
-        lf.write(f"[ADEMA CORE][INFO] Ejecutando: {job.action} (job_id={job_id})\n")
-        lf.flush()
-
-        process = Popen(
-          job.command,
-          cwd=str(ROOT_DIR),
-          stdout=PIPE,
-          stderr=STDOUT,
-          text=True,
-          bufsize=1,
-        )
-
-        if process.stdout:
-          for line in process.stdout:
-            lf.write(line)
+        with log_file.open("w", encoding="utf-8") as lf:
+            lf.write(f"[ADEMA CORE][INFO] Ejecutando: {job.action} (job_id={job_id})\n")
             lf.flush()
 
-        return_code = process.wait()
+            process = Popen(
+                exec_command,
+                cwd=str(ROOT_DIR),
+                stdout=PIPE,
+                stderr=STDOUT,
+                text=True,
+                bufsize=1,
+            )
 
-        with jobs_lock:
-            job.status = "success" if return_code == 0 else "failed"
-            job.return_code = return_code
+            if process.stdout:
+                for line in process.stdout:
+                    lf.write(line)
+                    lf.flush()
+
+            return_code = process.wait()
+
+            with jobs_lock:
+                job.status = "success" if return_code == 0 else "failed"
+                job.return_code = return_code
     except Exception as exc:
         with jobs_lock:
             job.status = "failed"
@@ -343,6 +384,7 @@ def _run_job_worker(job_id: str) -> None:
             job.error = str(exc)
         with log_file.open("a", encoding="utf-8") as lf:
             lf.write(f"\n[ERROR] {exc}\n")
+        app.logger.exception("Fallo ejecutando job %s", job_id)
 
 
 @app.get("/")
@@ -366,7 +408,7 @@ def index() -> Response:
     <!-- LOGIN: visible por defecto -->
     <section id="loginSection" class="panel bg-white/80 border border-slate-200 rounded-2xl p-8 shadow-sm max-w-lg mx-auto mt-20">
       <div class="mb-3">
-        <img src="/static/img/logo_ademasistemas.png" alt="Adema Sistemas" class="h-12 md:h-14 w-auto mx-auto" />
+        <img src="/static/img/logo_ademasistemas.png" alt="Adema Core" class="h-12 md:h-14 w-auto mx-auto" />
       </div>
       <p class="text-slate-500 text-sm mb-5">Ingresa tu token de acceso para continuar.</p>
       <div class="flex flex-col gap-3">
@@ -380,7 +422,7 @@ def index() -> Response:
     <div id="panelSection" class="hidden space-y-6">
       <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <img src="/static/img/logo_ademasistemas.png" alt="Adema Sistemas" class="h-10 md:h-12 w-auto" />
+          <img src="/static/img/logo_ademasistemas.png" alt="Adema Core" class="h-10 md:h-12 w-auto" />
           <div>
             <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Core - Control Center</h1>
             <p class="text-slate-600 mt-1">Centro operativo Adema Core para gestionar nodo Django + PostgreSQL.</p>
@@ -842,6 +884,10 @@ def index() -> Response:
         body: JSON.stringify(payload)
       });
 
+      if (resp.db_password_once) {
+        alert(`DB_PASSWORD generada para ${clientId}: ${resp.db_password_once}\n\nGuardala ahora. No se mostrara otra vez.`);
+      }
+
       activateJob(resp.job_id);
       setTimeout(refreshPanelData, 3000);
     });
@@ -884,6 +930,7 @@ def index() -> Response:
 
 
 @app.get("/api/health")
+@limiter.limit("10 per minute")
 def api_health() -> Response:
     try:
         snapshot = _run_snapshot()
@@ -893,6 +940,7 @@ def api_health() -> Response:
 
 
 @app.get("/api/auth/check")
+@limiter.limit("10 per minute")
 def api_auth_check() -> Response:
     # Si el request llega aqui, el token ya fue validado en before_request.
     return jsonify({"ok": True})
@@ -903,14 +951,26 @@ def api_create_tenant() -> Response:
     payload = request.get_json(silent=True) or {}
     try:
         client_id = _ensure_client_id(payload.get("client_id", ""))
-        command = ["sudo", "-n", "/bin/bash", str(CREATE_SCRIPT), client_id]
-
-        db_password = payload.get("db_password", "")
+        db_password = (payload.get("db_password") or "").strip()
+        generated_password: Optional[str] = None
         if db_password:
-            command.append(_ensure_password(db_password))
+            db_password = _ensure_password(db_password)
+        else:
+            generated_password = _ensure_password(_generate_db_password())
+            db_password = generated_password
+
+        command = [
+            "sudo",
+            "-n",
+            "/bin/bash",
+            str(CREATE_SCRIPT),
+            client_id,
+            db_password,
+            "--no-password-output",
+        ]
 
         job = _enqueue_job("create_tenant", command)
-        return jsonify({"ok": True, "job_id": job.id})
+        return jsonify({"ok": True, "job_id": job.id, "db_password_once": generated_password})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -972,19 +1032,19 @@ def api_delete_tenant_permanent() -> Response:
 
     confirm_client_id = _ensure_client_id(payload.get("confirm_client_id", ""))
     if confirm_client_id != client_id:
-      return jsonify({"error": "confirmacion_client_id_invalida. Debe escribir el CLIENT_ID exacto."}), 400
+        return jsonify({"error": "confirmacion_client_id_invalida. Debe escribir el CLIENT_ID exacto."}), 400
 
     items = _list_trash_items()
     if not any(item.get("client_id") == client_id for item in items):
         return jsonify({"error": "tenant_no_esta_en_papelera"}), 409
 
     if not _can_run_delete_without_password():
-      return jsonify(
-        {
-          "error": "Permisos incompletos para borrar tenant. Ejecuta una vez: sudo bash /home/adema/monitor/setup_web_panel.sh",
-          "error_code": "delete_sudoers_missing",
-        }
-      ), 503
+        return jsonify(
+            {
+                "error": "Permisos incompletos para borrar tenant. Ejecuta una vez: sudo bash /home/adema/monitor/setup_web_panel.sh",
+                "error_code": "delete_sudoers_missing",
+            }
+        ), 503
 
     command = ["sudo", "-n", "/bin/bash", str(DELETE_SCRIPT), client_id, "--force"]
     job = _enqueue_job("delete_tenant_permanent", command)

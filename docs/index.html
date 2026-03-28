@@ -283,7 +283,7 @@
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_RECIPIENT</td><td class="py-2 pr-4 font-mono text-indigo-700">ademasistemas@gmail.com</td><td class="py-2">Buzon central de monitoreo.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER</td><td class="py-2 pr-4 font-mono text-indigo-700">notificaciones@gestiondecreditos.app</td><td class="py-2">Sender profesional para alertas.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER_NAME</td><td class="py-2 pr-4 font-mono text-indigo-700">Notificaciones GDC - No responder</td><td class="py-2">Identificacion clara del origen de correo.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_HOST</td><td class="py-2 pr-4 font-mono text-indigo-700">172.17.0.1</td><td class="py-2">Bridge de Docker para alcanzar host PostgreSQL.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_HOST</td><td class="py-2 pr-4 font-mono text-indigo-700">(vacio para auto)</td><td class="py-2">Auto-deteccion de IP docker0 para alcanzar host PostgreSQL.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">RAM_THRESHOLD_MB</td><td class="py-2 pr-4 font-mono text-indigo-700">450</td><td class="py-2">Alerta temprana para evitar degradacion por memoria.</td></tr>
                                     <tr><td class="py-2 pr-4 font-mono">EXCLUDE_CONTAINER_REGEX</td><td class="py-2 pr-4 font-mono text-indigo-700">coolify|NAME</td><td class="py-2">Evita ruido monitoreando contenedores de sistema.</td></tr>
                                 </tbody>
@@ -292,7 +292,7 @@
                         <div class="mt-4 grid md:grid-cols-2 gap-4 text-xs font-mono">
                             <div class="text-slate-500">BACKUP_REMOTE:</div><div class="text-indigo-700 font-bold">do:cluster-gdc-01</div>
                             <div class="text-slate-500">DB_PREFIX:</div><div class="text-indigo-700 font-bold">adema</div>
-                            <div class="text-slate-500">DB_HOST:</div><div class="text-indigo-700 font-bold">172.17.0.1</div>
+                            <div class="text-slate-500">DB_HOST:</div><div class="text-indigo-700 font-bold">(auto docker0)</div>
                             <div class="text-slate-500">RETENTION:</div><div class="text-indigo-700 font-bold">30 days</div>
                         </div>
                         <p class="mt-4 text-xs text-slate-600"><strong>Nota:</strong> cuando pida <span class="font-mono">BREVO_API_KEY</span>, pega tu clave real de Brevo (no se muestra en pantalla).</p>
@@ -498,7 +498,7 @@
     </main>
 
     <footer class="mt-20 border-t border-slate-200 py-12 text-center text-slate-500 text-sm">
-        &copy; 2026 Adema Sistemas. Built for the community by Kevin Turkienich.
+        &copy; 2026 Adema Core. Built for the community by Kevin Turkienich.
     </footer>
 
     <script>

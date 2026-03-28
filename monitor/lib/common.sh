@@ -1,4 +1,6 @@
 #!/bin/bash
+# Adema Core - Common library
+# Repo oficial: https://github.com/adema-releases/adema-core
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MONITOR_DIR="$(cd "$COMMON_DIR/.." && pwd)"
@@ -77,6 +79,10 @@ load_monitor_env() {
     BREVO_SENDER="${BREVO_SENDER:-}"
     BREVO_SENDER_NAME="${BREVO_SENDER_NAME:-Adema Core Operaciones}"
 
+    DB_HOST="${DB_HOST:-${DB_DOCKER0_IP:-}}"
+    if [ -z "$DB_HOST" ]; then
+        DB_HOST="$(detect_docker0_ip || true)"
+    fi
     DB_HOST="${DB_HOST:-127.0.0.1}"
     DB_PORT="${DB_PORT:-5432}"
     RAM_THRESHOLD_MB="${RAM_THRESHOLD_MB:-450}"
@@ -85,6 +91,28 @@ load_monitor_env() {
     SECRETS_FILE="${SECRETS_FILE:-$MONITOR_DIR/.monitor.secrets}"
 
     load_env_file "$SECRETS_FILE"
+}
+
+detect_docker0_ip() {
+    ip -o -4 addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1
+}
+
+ensure_postgres_scram() {
+    local config_file
+
+    config_file="$(sudo -u postgres psql -t -A -c "SHOW config_file;" 2>/dev/null | tr -d '[:space:]')"
+    if [ -z "$config_file" ] || [ ! -f "$config_file" ]; then
+        echo "Error: no se pudo detectar postgresql.conf desde el servicio postgres." >&2
+        return 1
+    fi
+
+    if grep -Eq '^[[:space:]]*#?[[:space:]]*password_encryption[[:space:]]*=' "$config_file"; then
+        sed -i -E "s|^[[:space:]]*#?[[:space:]]*password_encryption[[:space:]]*=.*|password_encryption = 'scram-sha-256'|" "$config_file"
+    else
+        printf "\npassword_encryption = 'scram-sha-256'\n" >> "$config_file"
+    fi
+
+    sudo -u postgres psql -c "SELECT pg_reload_conf();" >/dev/null
 }
 
 db_name() {

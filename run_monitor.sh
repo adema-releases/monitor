@@ -1,4 +1,6 @@
 #!/bin/bash
+# Adema Core - CLI launcher
+# Repo oficial: https://github.com/adema-releases/adema-core
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$ROOT_DIR/monitor"
@@ -32,6 +34,9 @@ ask_value() {
 }
 
 configure_environment() {
+    local detected_docker0_ip
+    detected_docker0_ip="$(ip -o -4 addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+
     local project_code="django"
     local cluster_id="CLUSTER-DJANGO-01"
     local db_prefix="django"
@@ -46,7 +51,7 @@ configure_environment() {
     local brevo_recipient=""
     local brevo_sender=""
     local brevo_sender_name="Adema Core Operaciones"
-    local db_host="127.0.0.1"
+    local db_host="${detected_docker0_ip:-127.0.0.1}"
     local ram_threshold_mb="450"
     local exclude_regex="coolify|NAME"
 

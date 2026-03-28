@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# Adema Core - DB connectivity test
+# Repo oficial: https://github.com/adema-releases/adema-core
 # Uso: ./test_tenant_db.sh cli001 [DB_PASSWORD]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,18 +25,19 @@ if [ -z "$DB_PASS" ]; then
     echo
 fi
 
+DOCKER0_IP="$(detect_docker0_ip || true)"
+if [ -n "$DOCKER0_IP" ]; then
+    ACTIVE_DB_HOST="$DOCKER0_IP"
+else
+    ACTIVE_DB_HOST="$DB_HOST"
+fi
+
 echo "=== AUDITORIA DE CAPA DE DATOS: $CLIENT_ID ==="
-echo "Objetivo: host=$DB_HOST port=$DB_PORT db=$DB_NAME user=$DB_USER"
+echo "Objetivo: host=$ACTIVE_DB_HOST port=$DB_PORT db=$DB_NAME user=$DB_USER"
 
 TMP_ERR_CONN="/tmp/monitor_psql_conn_$$.err"
 TMP_ERR_SCHEMA="/tmp/monitor_psql_schema_$$.err"
 trap 'rm -f "$TMP_ERR_CONN" "$TMP_ERR_SCHEMA"' EXIT
-
-ACTIVE_DB_HOST="$DB_HOST"
-
-is_network_error() {
-    grep -Eqi 'Connection timed out|No route to host|could not connect to server|Connection refused' "$1"
-}
 
 try_connection() {
     local host="$1"
@@ -47,25 +50,28 @@ echo -n "[1/2] Verificando red, DB y credenciales... "
 if try_connection "$ACTIVE_DB_HOST" "$TMP_ERR_CONN"; then
     echo "OK"
 else
-    if [ "$DB_HOST" = "172.17.0.1" ] && [ -s "$TMP_ERR_CONN" ] && is_network_error "$TMP_ERR_CONN"; then
-        for fallback_host in 127.0.0.1 localhost; do
-            if try_connection "$fallback_host" "$TMP_ERR_CONN"; then
-                ACTIVE_DB_HOST="$fallback_host"
-                echo "OK"
-                echo "Aviso: el host 172.17.0.1 no respondio; se uso fallback $fallback_host."
-                echo "Sugerencia: actualiza DB_HOST en monitor/.monitor.env para evitar este fallback."
-                break
-            fi
-        done
-    fi
+    CONNECTED=0
+    for fallback_host in "$DB_HOST" 127.0.0.1 localhost; do
+        [ -n "$fallback_host" ] || continue
+        if [ "$fallback_host" = "$ACTIVE_DB_HOST" ]; then
+            continue
+        fi
+        if try_connection "$fallback_host" "$TMP_ERR_CONN"; then
+            ACTIVE_DB_HOST="$fallback_host"
+            CONNECTED=1
+            echo "OK"
+            echo "Aviso: se uso fallback de conectividad PostgreSQL: $fallback_host."
+            break
+        fi
+    done
 
-    if [ "$ACTIVE_DB_HOST" = "$DB_HOST" ]; then
+    if [ "$CONNECTED" -ne 1 ]; then
         echo "ERROR"
         if [ -s "$TMP_ERR_CONN" ]; then
             echo "Detalle PostgreSQL:"
             sed 's/^/  - /' "$TMP_ERR_CONN"
         fi
-        echo "Causa probable: DB inexistente, password incorrecta o PostgreSQL no escucha en ${DB_HOST}:${DB_PORT}."
+        echo "Causa probable: DB inexistente, password incorrecta o PostgreSQL no escucha en ${ACTIVE_DB_HOST}:${DB_PORT}."
         exit 1
     fi
 fi

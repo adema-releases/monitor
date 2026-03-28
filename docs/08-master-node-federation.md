@@ -4,7 +4,7 @@
 
 Un **Nodo Maestro** (o "Control Plane") consulta el endpoint `/api/health` de
 cada nodo esclavo para consolidar una vista global de toda la infraestructura de
-Adema Sistemas.
+Adema Core.
 
 ```
 ┌─────────────────────────────────┐

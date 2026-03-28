@@ -132,7 +132,7 @@ Si estas configurando el nodo NODO-001-GDC por primera vez, puedes usar estos va
 | BREVO_RECIPIENT | ademasistemas@gmail.com | Buzon central de monitoreo. |
 | BREVO_SENDER | notificaciones@gestiondecreditos.app | Sender profesional para alertas. |
 | BREVO_SENDER_NAME | Notificaciones GDC - No responder | Identificacion clara del origen de correo. |
-| DB_HOST | 172.17.0.1 | Bridge de Docker para alcanzar host PostgreSQL. |
+| DB_HOST | (vacio para auto) | Auto-deteccion de IP docker0 para alcanzar host PostgreSQL. |
 | RAM_THRESHOLD_MB | 450 | Alerta temprana para evitar degradacion por memoria. |
 | EXCLUDE_CONTAINER_REGEX | coolify\|NAME | Evita ruido monitoreando contenedores de sistema. |
 
@@ -140,7 +140,7 @@ Diccionario rapido:
 
 - BACKUP_REMOTE: do:cluster-gdc-01
 - DB_PREFIX: adema
-- DB_HOST: 172.17.0.1
+- DB_HOST: dejar vacio para auto-deteccion docker0
 - RETENTION: 30 days
 
 Nota: cuando pida BREVO_API_KEY, pega tu clave real de Brevo (no se muestra en pantalla).

@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# Adema Core - Health snapshot
+# Repo oficial: https://github.com/adema-releases/adema-core
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -19,6 +21,8 @@ RAM_TOTAL_MB=$(free -m | awk 'NR==2{print $2}')
 RAM_USED_MB=$(free -m | awk 'NR==2{print $3}')
 SWAP_TOTAL_MB=$(free -m | awk 'NR==3{print $2}')
 SWAP_USED_MB=$(free -m | awk 'NR==3{print $3}')
+DOCKER0_IP=$(detect_docker0_ip || true)
+ACTIVE_DB_HOST="${DOCKER0_IP:-$DB_HOST}"
 
 if ! CONTAINERS_RUNNING=$(docker ps --format '{{.Names}}' 2>/dev/null | awk -v re="${EXCLUDE_CONTAINER_REGEX:-^$}" 'NF && $0 !~ re {count++} END {print count+0}'); then
     # Si docker no esta disponible o falla, devolvemos 0 para no romper el snapshot.
@@ -38,8 +42,14 @@ printf '"hostname":"%s",' "$(json_escape "$HOSTNAME_VALUE")"
 printf '"uptime":"%s",' "$(json_escape "$UPTIME_TEXT")"
 printf '"load_avg":"%s",' "$(json_escape "$LOAD_AVG")"
 printf '"disk_root_usage":"%s",' "$(json_escape "$DISK_USAGE")"
+printf '"docker0_ip":"%s",' "$(json_escape "$DOCKER0_IP")"
 printf '"ram":{"total_mb":%s,"used_mb":%s},' "${RAM_TOTAL_MB:-0}" "${RAM_USED_MB:-0}"
 printf '"swap":{"total_mb":%s,"used_mb":%s}' "${SWAP_TOTAL_MB:-0}" "${SWAP_USED_MB:-0}"
+printf '},'
+
+printf '"database":{'
+printf '"host":"%s",' "$(json_escape "$ACTIVE_DB_HOST")"
+printf '"port":%s' "${DB_PORT:-5432}"
 printf '},'
 
 printf '"containers":{"running":%s,"stats":[' "${CONTAINERS_RUNNING:-0}"
