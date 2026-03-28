@@ -119,9 +119,15 @@ def _run_snapshot() -> dict:
 def _can_run_delete_without_password() -> bool:
     # Valida que el usuario del servicio pueda ejecutar delete_tenant.sh via sudo sin password.
     # Evitamos encolar un job que sabemos que fallara por permisos.
-    cmd = ["sudo", "-n", "-l", "/bin/bash", str(DELETE_SCRIPT)]
-    result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=6)
-    return result.returncode == 0
+  cmd = ["sudo", "-n", "-l"]
+  result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=6)
+  if result.returncode != 0:
+    return False
+
+  listing = f"{result.stdout}\n{result.stderr}"
+  script_path = re.escape(str(DELETE_SCRIPT))
+  rule_re = rf"NOPASSWD:\s*/bin/bash\s+{script_path}(?:\s+\*)?"
+  return re.search(rule_re, listing) is not None
 
 
 def _load_trash_items_unlocked() -> List[dict]:
