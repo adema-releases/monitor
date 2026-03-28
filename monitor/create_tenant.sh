@@ -2,7 +2,7 @@
 set -euo pipefail
 # Adema Core - Tenant bootstrap
 # Repo oficial: https://github.com/adema-releases/adema-core
-# Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--no-password-output]
+# Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--password-file RUTA] [--no-password-output]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
@@ -12,29 +12,51 @@ load_monitor_env
 CLIENT_ID="${1:-}"
 
 if ! ensure_client_id "$CLIENT_ID"; then
-    echo "Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--no-password-output]"
+    echo "Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--password-file RUTA] [--no-password-output]"
     exit 1
 fi
 
 DB_PASSWORD=""
 SHOW_DB_PASSWORD=1
+PASSWORD_FILE=""
 
-for arg in "${@:2}"; do
+ARGS=("${@:2}")
+IDX=0
+while [ "$IDX" -lt "${#ARGS[@]}" ]; do
+    arg="${ARGS[$IDX]}"
     case "$arg" in
         --no-password-output)
             SHOW_DB_PASSWORD=0
+            ;;
+        --password-file)
+            IDX=$((IDX + 1))
+            if [ "$IDX" -ge "${#ARGS[@]}" ]; then
+                echo "Error: falta ruta luego de --password-file"
+                exit 1
+            fi
+            PASSWORD_FILE="${ARGS[$IDX]}"
             ;;
         *)
             if [ -z "$DB_PASSWORD" ]; then
                 DB_PASSWORD="$arg"
             else
                 echo "Error: argumento extra no reconocido: $arg"
-                echo "Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--no-password-output]"
+                echo "Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--password-file RUTA] [--no-password-output]"
                 exit 1
             fi
             ;;
     esac
+    IDX=$((IDX + 1))
 done
+
+if [ -n "$PASSWORD_FILE" ]; then
+    if [ ! -f "$PASSWORD_FILE" ]; then
+        echo "Error: no existe archivo de password: $PASSWORD_FILE"
+        exit 1
+    fi
+    DB_PASSWORD="$(tr -d '\r\n' < "$PASSWORD_FILE")"
+    rm -f "$PASSWORD_FILE" || true
+fi
 
 if [ -z "$DB_PASSWORD" ]; then
     DB_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 16)

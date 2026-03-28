@@ -99,20 +99,33 @@ detect_docker0_ip() {
 
 ensure_postgres_scram() {
     local config_file
+    local changed
 
     config_file="$(sudo -u postgres psql -t -A -c "SHOW config_file;" 2>/dev/null | tr -d '[:space:]')"
     if [ -z "$config_file" ] || [ ! -f "$config_file" ]; then
-        echo "Error: no se pudo detectar postgresql.conf desde el servicio postgres." >&2
-        return 1
+        echo "Aviso: no se pudo detectar postgresql.conf; se aplicara SCRAM por sesion al crear usuario." >&2
+        return 0
     fi
 
+    changed=0
     if grep -Eq '^[[:space:]]*#?[[:space:]]*password_encryption[[:space:]]*=' "$config_file"; then
-        sed -i -E "s|^[[:space:]]*#?[[:space:]]*password_encryption[[:space:]]*=.*|password_encryption = 'scram-sha-256'|" "$config_file"
+        if sed -i -E "s|^[[:space:]]*#?[[:space:]]*password_encryption[[:space:]]*=.*|password_encryption = 'scram-sha-256'|" "$config_file"; then
+            changed=1
+        fi
     else
-        printf "\npassword_encryption = 'scram-sha-256'\n" >> "$config_file"
+        if printf "\npassword_encryption = 'scram-sha-256'\n" >> "$config_file"; then
+            changed=1
+        fi
     fi
 
-    sudo -u postgres psql -c "SELECT pg_reload_conf();" >/dev/null
+    if [ "$changed" -eq 1 ]; then
+        sudo -u postgres psql -c "SELECT pg_reload_conf();" >/dev/null || true
+    else
+        echo "Aviso: no se pudo persistir SCRAM en $config_file (posible filesystem read-only)." >&2
+        echo "Aviso: se continuara usando SCRAM por sesion durante la creacion de usuarios." >&2
+    fi
+
+    return 0
 }
 
 db_name() {

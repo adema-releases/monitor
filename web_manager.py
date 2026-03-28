@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import shutil
+import tempfile
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -401,6 +402,41 @@ def _build_connection_bundle(client_id: str, db_password: str) -> Dict[str, str]
   }
 
 
+def _write_secret_file(secret: str) -> Path:
+    fd, path = tempfile.mkstemp(prefix="secret_", suffix=".txt", dir=str(JOBS_DIR))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(secret)
+        os.chmod(path, 0o600)
+    except Exception:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
+    return Path(path)
+
+
+def _extract_secret_file_path(command: List[str]) -> Optional[Path]:
+    try:
+        idx = command.index("--password-file")
+    except ValueError:
+        return None
+
+    if idx + 1 >= len(command):
+        return None
+
+    try:
+        secret_path = Path(command[idx + 1]).resolve()
+    except OSError:
+        return None
+
+    if secret_path.parent != JOBS_DIR.resolve() or not secret_path.name.startswith("secret_"):
+        return None
+
+    return secret_path
+
+
 def _enqueue_job(action: str, command: List[str], safe_command: Optional[List[str]] = None) -> Job:
     job_id = uuid.uuid4().hex[:12]
     log_path = JOBS_DIR / f"{job_id}.log"
@@ -464,6 +500,13 @@ def _run_job_worker(job_id: str, exec_command: List[str]) -> None:
         with log_file.open("a", encoding="utf-8") as lf:
             lf.write(f"\n[ERROR] {exc}\n")
         app.logger.exception("Fallo ejecutando job %s", job_id)
+    finally:
+        secret_file = _extract_secret_file_path(exec_command)
+        if secret_file and secret_file.exists():
+            try:
+                secret_file.unlink()
+            except OSError:
+                app.logger.warning("No se pudo eliminar archivo temporal de secreto: %s", secret_file)
 
 
 @app.get("/")
@@ -1104,13 +1147,16 @@ def api_create_tenant() -> Response:
         else:
             db_password = _ensure_password(_generate_db_password())
 
+        secret_file = _write_secret_file(db_password)
+
         command = [
             "sudo",
             "-n",
             "/bin/bash",
             str(CREATE_SCRIPT),
             client_id,
-            db_password,
+          "--password-file",
+          str(secret_file),
             "--no-password-output",
         ]
 
