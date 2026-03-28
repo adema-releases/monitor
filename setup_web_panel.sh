@@ -53,7 +53,7 @@ chmod 640 "$ENV_FILE"
 
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install flask flask-limiter
+"$VENV_DIR/bin/pip" install flask flask-limiter waitress
 
 if command -v ufw >/dev/null 2>&1; then
     UFW_STATUS=$(ufw status | head -n1 || true)
@@ -123,7 +123,7 @@ User=$WEB_USER
 Group=$WEB_GROUP
 WorkingDirectory=$ROOT_DIR
 EnvironmentFile=$ENV_FILE
-ExecStart=$VENV_DIR/bin/python $ROOT_DIR/web_manager.py
+ExecStart=$VENV_DIR/bin/waitress-serve --listen=0.0.0.0:$WEB_PORT web_manager:app
 Restart=on-failure
 RestartSec=2
 # Cambios de seguridad para permitir ejecucion en /home

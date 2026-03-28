@@ -282,6 +282,8 @@ Alternativa directa:
 sudo bash setup_web_panel.sh
 ```
 
+Este paso tambien migra el servicio a Waitress (WSGI de produccion), eliminando el warning de Flask dev server en `journalctl`.
+
 ### Reiniciar y revisar estado (opciones nuevas)
 
 - `12) Reiniciar servicio panel web`

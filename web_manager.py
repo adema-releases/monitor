@@ -100,19 +100,18 @@ def _extract_token() -> str:
 
 @app.before_request
 def validate_token() -> Optional[Response]:
-    # La pagina principal es HTML estatico sin datos sensibles;
-    # los datos se obtienen via /api/* que SI requiere token.
-    if request.path in ["/", "/favicon.ico"]:
+  # Recursos publicos sin datos sensibles.
+  if request.path in ["/", "/favicon.ico", "/robots.txt"] or request.path.startswith("/static/"):
         return None
 
-    provided = _extract_token()
-    if provided and hmac.compare_digest(provided, TOKEN):
-        return None
+  provided = _extract_token()
+  if provided and hmac.compare_digest(provided, TOKEN):
+      return None
 
-    app.logger.warning("Intento no autorizado a %s desde ip=%s", request.path, request.remote_addr)
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "unauthorized"}), 401
-    return Response("Unauthorized", status=401)
+  app.logger.warning("Intento no autorizado a %s desde ip=%s", request.path, request.remote_addr)
+  if request.path.startswith("/api/"):
+      return jsonify({"error": "unauthorized"}), 401
+  return Response("Unauthorized", status=401)
 
 
 @app.errorhandler(429)
@@ -475,7 +474,7 @@ def index() -> Response:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Adema Core - Control Center</title>
-  <link rel="icon" type="image/png" href="/static/img/icon_ademasistemas.png" />
+  <link rel="icon" type="image/x-icon" href="/static/logo/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background: radial-gradient(circle at 10% 10%, #d9f99d 0%, #f8fafc 45%, #cbd5e1 100%); }
@@ -488,7 +487,7 @@ def index() -> Response:
     <!-- LOGIN: visible por defecto -->
     <section id="loginSection" class="panel bg-white/80 border border-slate-200 rounded-2xl p-8 shadow-sm max-w-lg mx-auto mt-20">
       <div class="mb-3">
-        <img src="/static/img/logo_ademasistemas.png" alt="Adema Core" class="h-12 md:h-14 w-auto mx-auto" />
+        <img src="/static/logo/logo.png" onerror="this.onerror=null;this.src='/static/img/logo_ademasistemas.png';" alt="Adema Core" class="h-12 md:h-14 w-auto mx-auto" />
       </div>
       <p class="text-slate-500 text-sm mb-5">Ingresa tu token de acceso para continuar.</p>
       <div class="flex flex-col gap-3">
@@ -502,7 +501,7 @@ def index() -> Response:
     <div id="panelSection" class="hidden space-y-6">
       <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <img src="/static/img/logo_ademasistemas.png" alt="Adema Core" class="h-10 md:h-12 w-auto" />
+          <img src="/static/logo/logo.png" onerror="this.onerror=null;this.src='/static/img/logo_ademasistemas.png';" alt="Adema Core" class="h-10 md:h-12 w-auto" />
           <div>
             <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Core - Control Center</h1>
             <p class="text-slate-600 mt-1">Centro operativo Adema Core para gestionar nodo Django + PostgreSQL.</p>

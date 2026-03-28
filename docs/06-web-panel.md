@@ -9,7 +9,7 @@ sudo bash setup_web_panel.sh
 Este instalador:
 
 - Crea usuario de servicio `adema` si no existe
-- Prepara virtualenv e instala Flask
+- Prepara virtualenv e instala Flask + Flask-Limiter + Waitress
 - Genera `ADEMA_WEB_TOKEN` en `/etc/adema/web_panel.env`
 - Configura sudoers con allowlist minima de scripts
 - Levanta `adema-web-panel.service` en systemd
@@ -177,6 +177,32 @@ Si no hay listener en `:5000`, reinstala y reinicia:
 sudo bash setup_web_panel.sh
 sudo systemctl restart adema-web-panel.service
 ```
+
+### Warning `This is a development server` en logs
+
+Si ves este warning en `journalctl`, el servicio aun esta arrancando con `python web_manager.py` (servidor dev de Flask).
+
+Reaplica instalador para migrar a Waitress (WSGI para produccion):
+
+```bash
+sudo bash setup_web_panel.sh
+sudo systemctl daemon-reload
+sudo systemctl restart adema-web-panel.service
+```
+
+Verifica que el `ExecStart` quede con `waitress-serve`:
+
+```bash
+sudo systemctl cat adema-web-panel.service
+```
+
+Salida esperada (resumen):
+
+```text
+ExecStart=/home/adema/monitor/.venv_web_panel/bin/waitress-serve --listen=0.0.0.0:5000 web_manager:app
+```
+
+Nota: desde esta version los recursos `/static/*` son publicos para evitar 401 de imagenes/logo en la pantalla de login.
 
 ### Error de dependencia: `No module named flask_limiter`
 
