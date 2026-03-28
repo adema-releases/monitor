@@ -68,10 +68,10 @@ cat > "$SUDOERS_FILE" <<EOF
 # SOLO permite ejecutar scripts especificos como root.
 # El wildcard (*) permite argumentos pero NO subcomandos.
 Defaults:$WEB_USER !requiretty
-$WEB_USER ALL=(root) NOPASSWD: /bin/bash $STATUS_SCRIPT ""
+$WEB_USER ALL=(root) NOPASSWD: /bin/bash $STATUS_SCRIPT
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $CREATE_SCRIPT *
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $TEST_SCRIPT *
-$WEB_USER ALL=(root) NOPASSWD: /bin/bash $BACKUP_SCRIPT ""
+$WEB_USER ALL=(root) NOPASSWD: /bin/bash $BACKUP_SCRIPT
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -cf "$SUDOERS_FILE" >/dev/null

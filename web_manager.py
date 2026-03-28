@@ -193,75 +193,95 @@ def index() -> Response:
 </head>
 <body class="min-h-screen text-slate-900">
   <main class="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-    <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm">
-      <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Control Center</h1>
-      <p class="text-slate-600 mt-1">MVP operativo para gestionar nodo Django + PostgreSQL.</p>
-      <div class="mt-4 flex flex-col md:flex-row gap-3">
-        <input id="tokenInput" type="password" class="w-full md:w-[420px] border rounded-xl px-3 py-2" placeholder="ADEMA_WEB_TOKEN" />
-        <button id="saveTokenBtn" class="bg-lime-600 hover:bg-lime-700 text-white rounded-xl px-4 py-2 font-semibold">Guardar token</button>
-      </div>
-    </header>
 
-    <section class="grid md:grid-cols-4 gap-4">
-      <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-        <h2 class="text-xs uppercase tracking-wider text-slate-500">Host</h2>
-        <p id="hostName" class="text-lg font-bold">-</p>
-      </article>
-      <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-        <h2 class="text-xs uppercase tracking-wider text-slate-500">RAM</h2>
-        <p id="ramUsage" class="text-lg font-bold">-</p>
-      </article>
-      <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-        <h2 class="text-xs uppercase tracking-wider text-slate-500">Disco /</h2>
-        <p id="diskUsage" class="text-lg font-bold">-</p>
-      </article>
-      <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-        <h2 class="text-xs uppercase tracking-wider text-slate-500">Contenedores</h2>
-        <p id="containersCount" class="text-lg font-bold">-</p>
-      </article>
-    </section>
-
-    <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-4">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-xl font-bold">Gestion de Tenants</h2>
-        <button id="backupBtn" class="bg-slate-900 hover:bg-slate-700 text-white rounded-xl px-4 py-2 font-semibold">Backup Now</button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-500 border-b">
-              <th class="py-2">CLIENT_ID</th>
-              <th class="py-2">DB</th>
-              <th class="py-2">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tenantsBody"></tbody>
-        </table>
+    <!-- LOGIN: visible por defecto -->
+    <section id="loginSection" class="panel bg-white/80 border border-slate-200 rounded-2xl p-8 shadow-sm max-w-lg mx-auto mt-20">
+      <h1 class="text-2xl font-black tracking-tight mb-1">Adema Control Center</h1>
+      <p class="text-slate-500 text-sm mb-5">Ingresa tu token de acceso para continuar.</p>
+      <div class="flex flex-col gap-3">
+        <input id="tokenInput" type="password" class="w-full border rounded-xl px-3 py-2" placeholder="ADEMA_WEB_TOKEN" />
+        <button id="saveTokenBtn" class="bg-lime-600 hover:bg-lime-700 text-white rounded-xl px-4 py-2 font-semibold">Ingresar</button>
+        <p id="loginError" class="text-red-600 text-sm hidden">Token invalido. Verifica e intenta de nuevo.</p>
       </div>
     </section>
 
-    <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-3">
-      <h2 class="text-xl font-bold">Formulario de Alta</h2>
-      <div class="grid md:grid-cols-3 gap-3">
-        <input id="clientIdInput" class="border rounded-xl px-3 py-2" placeholder="cli001" />
-        <input id="clientPassInput" class="border rounded-xl px-3 py-2" placeholder="DB password opcional" />
-        <button id="createTenantBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Crear Infraestructura</button>
-      </div>
-      <p class="text-xs text-slate-500">Si no envias password, create_tenant.sh generara una automaticamente.</p>
-    </section>
+    <!-- PANEL: oculto hasta autenticacion -->
+    <div id="panelSection" class="hidden space-y-6">
+      <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Control Center</h1>
+          <p class="text-slate-600 mt-1">MVP operativo para gestionar nodo Django + PostgreSQL.</p>
+        </div>
+        <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-2 font-semibold text-sm">Cerrar sesion</button>
+      </header>
 
-    <section class="panel bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl p-5 shadow-sm">
-      <div class="flex items-center justify-between gap-3 mb-2">
-        <h2 class="text-xl font-bold">Logs en tiempo real</h2>
-        <span id="jobStatus" class="text-xs bg-slate-700 px-2 py-1 rounded">sin job activo</span>
-      </div>
-      <pre id="logOutput" class="text-xs whitespace-pre-wrap h-72 overflow-auto bg-black/30 rounded-xl p-3"></pre>
-    </section>
+      <section class="grid md:grid-cols-4 gap-4">
+        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
+          <h2 class="text-xs uppercase tracking-wider text-slate-500">Host</h2>
+          <p id="hostName" class="text-lg font-bold">-</p>
+        </article>
+        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
+          <h2 class="text-xs uppercase tracking-wider text-slate-500">RAM</h2>
+          <p id="ramUsage" class="text-lg font-bold">-</p>
+        </article>
+        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
+          <h2 class="text-xs uppercase tracking-wider text-slate-500">Disco /</h2>
+          <p id="diskUsage" class="text-lg font-bold">-</p>
+        </article>
+        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
+          <h2 class="text-xs uppercase tracking-wider text-slate-500">Contenedores</h2>
+          <p id="containersCount" class="text-lg font-bold">-</p>
+        </article>
+      </section>
+
+      <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-bold">Gestion de Tenants</h2>
+          <button id="backupBtn" class="bg-slate-900 hover:bg-slate-700 text-white rounded-xl px-4 py-2 font-semibold">Backup Now</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500 border-b">
+                <th class="py-2">CLIENT_ID</th>
+                <th class="py-2">DB</th>
+                <th class="py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tenantsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-3">
+        <h2 class="text-xl font-bold">Formulario de Alta</h2>
+        <div class="grid md:grid-cols-3 gap-3">
+          <input id="clientIdInput" class="border rounded-xl px-3 py-2" placeholder="cli001" />
+          <input id="clientPassInput" class="border rounded-xl px-3 py-2" placeholder="DB password opcional" />
+          <button id="createTenantBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Crear Infraestructura</button>
+        </div>
+        <p class="text-xs text-slate-500">Si no envias password, create_tenant.sh generara una automaticamente.</p>
+      </section>
+
+      <section class="panel bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <h2 class="text-xl font-bold">Logs en tiempo real</h2>
+          <span id="jobStatus" class="text-xs bg-slate-700 px-2 py-1 rounded">sin job activo</span>
+        </div>
+        <pre id="logOutput" class="text-xs whitespace-pre-wrap h-72 overflow-auto bg-black/30 rounded-xl p-3"></pre>
+      </section>
+    </div>
+
   </main>
 
   <script>
     let activeJobId = null;
     let activeOffset = 0;
+    let healthInterval = null;
+
+    const loginSection = document.getElementById("loginSection");
+    const panelSection = document.getElementById("panelSection");
+    const loginError = document.getElementById("loginError");
 
     function getToken() {
       return localStorage.getItem("adema_token") || "";
@@ -269,7 +289,18 @@ def index() -> Response:
 
     function setToken(token) {
       localStorage.setItem("adema_token", token);
-      document.getElementById("tokenInput").value = token;
+    }
+
+    function showLogin() {
+      loginSection.classList.remove("hidden");
+      panelSection.classList.add("hidden");
+      loginError.classList.add("hidden");
+      if (healthInterval) { clearInterval(healthInterval); healthInterval = null; }
+    }
+
+    function showPanel() {
+      loginSection.classList.add("hidden");
+      panelSection.classList.remove("hidden");
     }
 
     async function api(path, options = {}) {
@@ -319,7 +350,27 @@ def index() -> Response:
         const data = await api("/api/health");
         renderHealth(data);
       } catch (err) {
-        document.getElementById("hostName").textContent = "token invalido o sin permisos";
+        if (err.message.includes("401")) {
+          showLogin();
+          loginError.classList.remove("hidden");
+          loginError.textContent = "Sesion expirada o token invalido.";
+        }
+      }
+    }
+
+    async function tryLogin() {
+      const t = document.getElementById("tokenInput").value.trim();
+      if (!t) return;
+      setToken(t);
+      try {
+        const data = await api("/api/health");
+        showPanel();
+        renderHealth(data);
+        healthInterval = setInterval(refreshHealth, 15000);
+      } catch (err) {
+        localStorage.removeItem("adema_token");
+        loginError.classList.remove("hidden");
+        loginError.textContent = "Token invalido. Verifica e intenta de nuevo.";
       }
     }
 
@@ -349,10 +400,15 @@ def index() -> Response:
       }
     }
 
-    document.getElementById("saveTokenBtn").addEventListener("click", () => {
-      const t = document.getElementById("tokenInput").value.trim();
-      setToken(t);
-      refreshHealth();
+    document.getElementById("saveTokenBtn").addEventListener("click", tryLogin);
+    document.getElementById("tokenInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") tryLogin();
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      localStorage.removeItem("adema_token");
+      showLogin();
+      document.getElementById("tokenInput").value = "";
     });
 
     document.getElementById("createTenantBtn").addEventListener("click", async () => {
@@ -378,14 +434,16 @@ def index() -> Response:
       activateJob(resp.job_id);
     });
 
+    // Auto-login si hay token guardado o en la URL
     const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
     if (tokenFromQuery) {
       setToken(tokenFromQuery);
       window.history.replaceState({}, '', window.location.pathname);
     }
-    setToken(getToken());
-    refreshHealth();
-    setInterval(refreshHealth, 15000);
+    if (getToken()) {
+      document.getElementById("tokenInput").value = "••••••••";
+      tryLogin();
+    }
   </script>
 </body>
 </html>
