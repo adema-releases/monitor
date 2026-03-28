@@ -162,6 +162,28 @@ run_test_db() {
     run_script "$SCRIPTS_DIR/test_tenant_db.sh" "$client_id" "$db_password"
 }
 
+run_setup_web_panel() {
+    run_script "$ROOT_DIR/setup_web_panel.sh"
+}
+
+run_restart_web_panel() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: esta opcion requiere sudo/root."
+        return 1
+    fi
+
+    systemctl restart adema-web-panel.service
+    systemctl --no-pager --full status adema-web-panel.service | sed -n '1,20p'
+}
+
+run_status_web_panel() {
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --no-pager --full status adema-web-panel.service | sed -n '1,25p'
+    else
+        echo "systemctl no disponible en este host."
+    fi
+}
+
 menu() {
     while true; do
         echo
@@ -175,6 +197,10 @@ menu() {
         echo "7) Enviar reporte de monitor"
         echo "8) Ejecutar centinela de RAM"
         echo "9) Instalar/actualizar cron de produccion"
+        echo "10) Regenerar token del panel web"
+        echo "11) Instalar/actualizar panel web"
+        echo "12) Reiniciar servicio panel web"
+        echo "13) Ver estado servicio panel web"
         echo "0) Salir"
         read -r -p "Opcion: " option
 
@@ -188,6 +214,10 @@ menu() {
             7) run_script "$SCRIPTS_DIR/monitor_report.sh" ;;
             8) run_script "$SCRIPTS_DIR/sentinel_ram.sh" ;;
             9) run_script "$ROOT_DIR/setup_cron.sh" ;;
+            10) run_script "$ROOT_DIR/rotate_web_token.sh" ;;
+            11) run_setup_web_panel ;;
+            12) run_restart_web_panel ;;
+            13) run_status_web_panel ;;
             0) exit 0 ;;
             *) echo "Opcion invalida" ;;
         esac
