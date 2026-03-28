@@ -448,6 +448,30 @@ def index() -> Response:
       </section>
     </div>
 
+    <div id="deleteTenantModal" class="hidden fixed inset-0 z-50 bg-black/50 p-4">
+      <div class="max-w-lg mx-auto mt-16 md:mt-24 bg-white rounded-2xl shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200">
+          <h3 class="text-xl font-black text-slate-900">Confirmar Borrado Definitivo</h3>
+          <p class="text-sm text-slate-600 mt-1">Esta accion elimina base de datos, usuario SQL y volumenes del tenant.</p>
+        </div>
+        <div class="p-5 space-y-4">
+          <p class="text-sm text-slate-700">Tenant objetivo: <span id="deleteTenantTarget" class="font-bold">-</span></p>
+
+          <label class="block text-sm font-semibold text-slate-700" for="confirmClientIdInput">Escribe el CLIENT_ID exacto</label>
+          <input id="confirmClientIdInput" class="w-full border rounded-xl px-3 py-2" placeholder="cli001" autocomplete="off" />
+
+          <label class="block text-sm font-semibold text-slate-700" for="confirmPhraseInput">Escribe la frase de confirmacion</label>
+          <input id="confirmPhraseInput" class="w-full border rounded-xl px-3 py-2" placeholder="BORRAR TENANT" autocomplete="off" />
+
+          <p id="deleteModalError" class="text-sm text-red-600 hidden"></p>
+        </div>
+        <div class="p-5 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button id="cancelDeleteBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-4 py-2 font-semibold">Cancelar</button>
+          <button id="confirmDeleteBtn" class="bg-red-700 hover:bg-red-800 text-white rounded-xl px-4 py-2 font-semibold">Eliminar definitivo</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -458,10 +482,17 @@ def index() -> Response:
     let deleteConfirmText = "BORRAR TENANT";
     let requireDeleteClientId = true;
     let lastHealthData = null;
+    let pendingDeleteClientId = null;
 
     const loginSection = document.getElementById("loginSection");
     const panelSection = document.getElementById("panelSection");
     const loginError = document.getElementById("loginError");
+    const deleteTenantModal = document.getElementById("deleteTenantModal");
+    const deleteTenantTarget = document.getElementById("deleteTenantTarget");
+    const confirmClientIdInput = document.getElementById("confirmClientIdInput");
+    const confirmPhraseInput = document.getElementById("confirmPhraseInput");
+    const deleteModalError = document.getElementById("deleteModalError");
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 
     function getToken() {
       return localStorage.getItem("adema_token") || "";
@@ -489,13 +520,87 @@ def index() -> Response:
         "X-ADEMA-TOKEN": getToken()
       });
       const res = await fetch(path, Object.assign({}, options, { headers }));
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      let payload = null;
+      let textPayload = "";
+
+      if (contentType.includes("application/json")) {
+        payload = await res.json();
+      } else {
+        textPayload = await res.text();
+      }
+
       if (!res.ok) {
-        const err = await res.text();
-        const e = new Error(err || `HTTP ${res.status}`);
+        const message = payload?.error || payload?.message || textPayload || `HTTP ${res.status}`;
+        const e = new Error(message);
         e.status = res.status;
+        e.payload = payload;
         throw e;
       }
-      return res.json();
+      return payload !== null ? payload : {};
+    }
+
+    function showDeleteModalError(msg) {
+      deleteModalError.textContent = msg;
+      deleteModalError.classList.remove("hidden");
+    }
+
+    function clearDeleteModalError() {
+      deleteModalError.textContent = "";
+      deleteModalError.classList.add("hidden");
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteClientId = null;
+      confirmClientIdInput.value = "";
+      confirmPhraseInput.value = "";
+      clearDeleteModalError();
+      deleteTenantModal.classList.add("hidden");
+    }
+
+    function openDeleteModal(clientId) {
+      pendingDeleteClientId = clientId;
+      deleteTenantTarget.textContent = clientId;
+      confirmClientIdInput.value = "";
+      confirmPhraseInput.value = "";
+      clearDeleteModalError();
+      deleteTenantModal.classList.remove("hidden");
+      setTimeout(() => confirmClientIdInput.focus(), 0);
+    }
+
+    async function submitDeleteModal() {
+      if (!pendingDeleteClientId) return;
+
+      const typedClientId = confirmClientIdInput.value.trim();
+      const typedPhrase = confirmPhraseInput.value.trim();
+
+      if (requireDeleteClientId && typedClientId !== pendingDeleteClientId) {
+        showDeleteModalError("CLIENT_ID incorrecto. Debe coincidir exactamente.");
+        return;
+      }
+      if (typedPhrase !== deleteConfirmText) {
+        showDeleteModalError(`Frase incorrecta. Debes escribir exactamente: ${deleteConfirmText}`);
+        return;
+      }
+
+      confirmDeleteBtn.disabled = true;
+      try {
+        const resp = await api("/api/tenant/delete-permanent", {
+          method: "POST",
+          body: JSON.stringify({
+            client_id: pendingDeleteClientId,
+            confirm_text: typedPhrase,
+            confirm_client_id: typedClientId || pendingDeleteClientId,
+          })
+        });
+        closeDeleteModal();
+        await refreshTrash();
+        activateJob(resp.job_id);
+      } catch (err) {
+        showDeleteModalError(err.message || "No se pudo iniciar el borrado definitivo.");
+      } finally {
+        confirmDeleteBtn.disabled = false;
+      }
     }
 
     function escapeHtml(value) {
@@ -578,32 +683,7 @@ def index() -> Response:
       document.querySelectorAll(".delete-tenant").forEach((btn) => {
         btn.addEventListener("click", async () => {
           const clientId = btn.dataset.client;
-          const phrase = prompt(`Para eliminar definitivamente ${clientId}, escribe exactamente: ${deleteConfirmText}`);
-          if (!phrase) return;
-          if (phrase.trim() !== deleteConfirmText) {
-            alert(`Frase incorrecta. Debes escribir exactamente: ${deleteConfirmText}`);
-            return;
-          }
-          const confirmDelete = confirm(`Ultima confirmacion: eliminar definitivamente ${clientId}. Esta accion NO se puede deshacer.`);
-          if (!confirmDelete) return;
-
-          let confirmClientId = clientId;
-          if (requireDeleteClientId) {
-            const clientText = prompt(`Confirma el CLIENT_ID escribiendolo exactamente: ${clientId}`);
-            if (!clientText) return;
-            if (clientText.trim() !== clientId) {
-              alert("CLIENT_ID incorrecto. Se cancelo el borrado definitivo.");
-              return;
-            }
-            confirmClientId = clientText.trim();
-          }
-
-          const resp = await api("/api/tenant/delete-permanent", {
-            method: "POST",
-            body: JSON.stringify({ client_id: clientId, confirm_text: phrase.trim(), confirm_client_id: confirmClientId })
-          });
-          await refreshTrash();
-          activateJob(resp.job_id);
+          openDeleteModal(clientId);
         });
       });
     }
@@ -746,6 +826,18 @@ def index() -> Response:
         body: JSON.stringify({})
       });
       activateJob(resp.job_id);
+    });
+
+    document.getElementById("cancelDeleteBtn").addEventListener("click", closeDeleteModal);
+    confirmDeleteBtn.addEventListener("click", submitDeleteModal);
+    confirmPhraseInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitDeleteModal();
+    });
+    confirmClientIdInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitDeleteModal();
+    });
+    deleteTenantModal.addEventListener("click", (e) => {
+      if (e.target === deleteTenantModal) closeDeleteModal();
     });
 
     // Auto-login si hay token guardado o en la URL
