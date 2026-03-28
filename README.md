@@ -1,4 +1,4 @@
-# Monitor Django Multi-Proyecto
+# Adema Core Django Multi-Proyecto
 
 Este repositorio contiene scripts Bash para operar y monitorear multiples proyectos Django desplegados en contenedores.
 
@@ -24,6 +24,8 @@ Guia por tarea en la carpeta `docs/`:
 - `docs/04-backup-restore.md`: backup y restauracion.
 - `docs/05-health-and-alerts.md`: snapshot, test DB, monitor y centinela.
 - `docs/06-web-panel.md`: instalacion y operacion del panel web seguro.
+- `docs/07-go-live-checklist.md`: checklist operativo previo a salida productiva.
+- `docs/08-master-node-federation.md`: federacion de nodos y arquitectura master.
 
 ## Higiene Open Source
 
@@ -35,7 +37,7 @@ Guia por tarea en la carpeta `docs/`:
 ## Quickstart (5 minutos)
 
 ```bash
-git clone https://github.com/adema-releases/monitor
+git clone https://github.com/adema-releases/adema-core
 cd monitor
 sudo chmod +x run_monitor.sh setup_cron.sh setup_web_panel.sh monitor/*.sh
 sudo bash run_monitor.sh
@@ -135,7 +137,7 @@ chmod 600 monitor/.monitor.secrets
 En `monitor/.monitor.env`:
 
 - Usa comillas dobles cuando el valor tenga espacios o caracteres especiales de shell (por ejemplo `|`).
-- Ejemplos: `BREVO_SENDER_NAME="Monitor Operaciones"` y `EXCLUDE_CONTAINER_REGEX="coolify|NAME"`.
+- Ejemplos: `BREVO_SENDER_NAME="Adema Core Operaciones"` y `EXCLUDE_CONTAINER_REGEX="coolify|NAME"`.
 
 - `PROJECT_CODE`: codigo del proyecto (ejemplo `miapp`).
 - `CLUSTER_ID`: identificador del cluster/nodo.
@@ -224,10 +226,86 @@ Menu:
 4. Ejecutar backup
 5. Restaurar tenant
 6. Testear DB
-7. Enviar reporte de monitor
+7. Enviar reporte operativo Adema Core
 8. Ejecutar centinela de RAM
 9. Instalar/actualizar cron de produccion
+10. Regenerar token del panel web
+11. Instalar/actualizar panel web
+12. Reiniciar servicio panel web
+13. Ver estado servicio panel web
 0. Salir
+
+## Recuperar token y reinstalar panel web
+
+### Ver token actual
+
+```bash
+sudo grep '^ADEMA_WEB_TOKEN=' /etc/adema/web_panel.env
+```
+
+### Regenerar token (opcion nueva del launcher)
+
+```bash
+sudo bash run_monitor.sh
+```
+
+Elegir:
+
+- `10) Regenerar token del panel web`
+
+Alternativa directa:
+
+```bash
+sudo bash rotate_web_token.sh
+```
+
+### Reinstalar/actualizar panel (opcion nueva del launcher)
+
+En el launcher elegir:
+
+- `11) Instalar/actualizar panel web`
+
+Alternativa directa:
+
+```bash
+sudo bash setup_web_panel.sh
+```
+
+### Reiniciar y revisar estado (opciones nuevas)
+
+- `12) Reiniciar servicio panel web`
+- `13) Ver estado servicio panel web`
+
+### Troubleshooting rapido del panel
+
+1) Unauthorized / token invalido:
+
+```bash
+sudo grep '^ADEMA_WEB_TOKEN=' /etc/adema/web_panel.env
+sudo bash rotate_web_token.sh
+```
+
+2) Servicio no levanta:
+
+```bash
+sudo systemctl status adema-web-panel.service --no-pager
+sudo journalctl -u adema-web-panel.service -n 120 --no-pager
+sudo bash setup_web_panel.sh
+```
+
+3) API falla en crear/borrar tenant (permisos sudoers):
+
+```bash
+sudo visudo -cf /etc/sudoers.d/adema-monitor-web
+sudo bash setup_web_panel.sh
+```
+
+4) Panel inaccesible desde afuera:
+
+```bash
+sudo ufw status
+sudo ufw allow 5000/tcp
+```
 
 ## Cron de produccion
 

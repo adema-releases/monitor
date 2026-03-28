@@ -75,7 +75,7 @@ sudo useradd -m -s /bin/bash adema
 sudo usermod -aG sudo adema
 
 # 2. Clonar el Framework en la ruta correcta (fuera de root)
-sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor
+sudo -u adema git clone https://github.com/adema-releases/adema-core /home/adema/monitor
 cd /home/adema/monitor
 
 # 3. Asegurar permisos de ejecucion de scripts

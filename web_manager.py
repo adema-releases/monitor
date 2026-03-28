@@ -287,7 +287,7 @@ def _enqueue_job(action: str, command: List[str]) -> Job:
     now = datetime.now(timezone.utc).isoformat()
     job = Job(
         id=job_id,
-        action=action,
+      action=f"Adema Core | {action}",
         created_at=now,
         status="queued",
         return_code=None,
@@ -313,25 +313,25 @@ def _run_job_worker(job_id: str) -> None:
 
     log_file = Path(job.log_path)
     try:
-        with log_file.open("w", encoding="utf-8") as lf:
-            lf.write(f"[INFO] Ejecutando: {job.action} (job_id={job_id})\n")
+      with log_file.open("w", encoding="utf-8") as lf:
+        lf.write(f"[ADEMA CORE][INFO] Ejecutando: {job.action} (job_id={job_id})\n")
+        lf.flush()
+
+        process = Popen(
+          job.command,
+          cwd=str(ROOT_DIR),
+          stdout=PIPE,
+          stderr=STDOUT,
+          text=True,
+          bufsize=1,
+        )
+
+        if process.stdout:
+          for line in process.stdout:
+            lf.write(line)
             lf.flush()
 
-            process = Popen(
-                job.command,
-                cwd=str(ROOT_DIR),
-                stdout=PIPE,
-                stderr=STDOUT,
-                text=True,
-                bufsize=1,
-            )
-
-            if process.stdout:
-                for line in process.stdout:
-                    lf.write(line)
-                    lf.flush()
-
-            return_code = process.wait()
+        return_code = process.wait()
 
         with jobs_lock:
             job.status = "success" if return_code == 0 else "failed"
@@ -352,7 +352,8 @@ def index() -> Response:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Adema Control Center</title>
+  <title>Adema Core - Control Center</title>
+  <link rel="icon" type="image/png" href="/static/img/icon_ademasistemas.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background: radial-gradient(circle at 10% 10%, #d9f99d 0%, #f8fafc 45%, #cbd5e1 100%); }
@@ -364,7 +365,9 @@ def index() -> Response:
 
     <!-- LOGIN: visible por defecto -->
     <section id="loginSection" class="panel bg-white/80 border border-slate-200 rounded-2xl p-8 shadow-sm max-w-lg mx-auto mt-20">
-      <h1 class="text-2xl font-black tracking-tight mb-1">Adema Control Center</h1>
+      <div class="mb-3">
+        <img src="/static/img/logo_ademasistemas.png" alt="Adema Sistemas" class="h-12 md:h-14 w-auto mx-auto" />
+      </div>
       <p class="text-slate-500 text-sm mb-5">Ingresa tu token de acceso para continuar.</p>
       <div class="flex flex-col gap-3">
         <input id="tokenInput" type="password" class="w-full border rounded-xl px-3 py-2" placeholder="ADEMA_WEB_TOKEN" />
@@ -376,9 +379,12 @@ def index() -> Response:
     <!-- PANEL: oculto hasta autenticacion -->
     <div id="panelSection" class="hidden space-y-6">
       <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Control Center</h1>
-          <p class="text-slate-600 mt-1">MVP operativo para gestionar nodo Django + PostgreSQL.</p>
+        <div class="flex items-center gap-3">
+          <img src="/static/img/logo_ademasistemas.png" alt="Adema Sistemas" class="h-10 md:h-12 w-auto" />
+          <div>
+            <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Core - Control Center</h1>
+            <p class="text-slate-600 mt-1">Centro operativo Adema Core para gestionar nodo Django + PostgreSQL.</p>
+          </div>
         </div>
         <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-2 font-semibold text-sm">Cerrar sesion</button>
       </header>

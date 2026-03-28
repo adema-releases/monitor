@@ -45,7 +45,7 @@ configure_environment() {
     local backup_remote="r2:django-backups"
     local brevo_recipient=""
     local brevo_sender=""
-    local brevo_sender_name="Monitor Operaciones"
+    local brevo_sender_name="Adema Core Operaciones"
     local db_host="172.17.0.1"
     local ram_threshold_mb="450"
     local exclude_regex="coolify|NAME"
@@ -187,14 +187,14 @@ run_status_web_panel() {
 menu() {
     while true; do
         echo
-        echo "===== MONITOR CLI ====="
+        echo "===== ADEMA CORE CLI ====="
         echo "1) Configurar variables y secretos"
         echo "2) Crear tenant"
         echo "3) Borrar tenant"
         echo "4) Ejecutar backup"
         echo "5) Restaurar tenant"
         echo "6) Testear DB"
-        echo "7) Enviar reporte de monitor"
+        echo "7) Enviar reporte operativo Adema Core"
         echo "8) Ejecutar centinela de RAM"
         echo "9) Instalar/actualizar cron de produccion"
         echo "10) Regenerar token del panel web"

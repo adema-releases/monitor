@@ -15,7 +15,7 @@ CPU_CARGA=$(uptime | awk -F'load average:' '{ print $2 }' | xargs)
 DISCO_USO=$(df -h / | awk 'NR==2{print $5}')
 
 STATS_RAW=$(docker stats --no-stream --format '{{.Name}} | CPU: {{.CPUPerc}} | RAM: {{.MemUsage}}' | grep -v -E "$EXCLUDE_CONTAINER_REGEX")
-ASUNTO="$CLUSTER_ID | Proyecto: $PROJECT_CODE | Nodos: $NODOS_ACTIVOS | Estado: OK"
+ASUNTO="[Adema Core] $CLUSTER_ID | Proyecto: $PROJECT_CODE | Nodos: $NODOS_ACTIVOS | Estado: OK"
 
 BODY_TEXT="REPORTE DE OPERACIONES: $CLUSTER_ID\n"
 BODY_TEXT="${BODY_TEXT}Proyecto: $PROJECT_CODE\n"
@@ -45,7 +45,7 @@ else
             ESTADO_DB="OK ($LAST_BACKUP)"
         else
             ESTADO_DB="CRITICO (Sin backup reciente)"
-            ASUNTO="$CLUSTER_ID | ALERTA BACKUP: $CLIENT_ID"
+            ASUNTO="[Adema Core] $CLUSTER_ID | ALERTA BACKUP: $CLIENT_ID"
         fi
 
         BODY_TEXT="${BODY_TEXT}> Cliente: $CLIENT_ID\n"

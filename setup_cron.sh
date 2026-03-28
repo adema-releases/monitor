@@ -15,7 +15,7 @@ fi
 
 mkdir -p "$LOG_DIR"
 
-echo "Configurador de cron para monitor Django"
+echo "Configurador de cron para Adema Core Django"
 echo "Los jobs se instalaran en el crontab del usuario actual: $(whoami)"
 echo
 
@@ -25,7 +25,7 @@ BACKUP_HOUR="${BACKUP_HOUR:-2}"
 read -r -p "Minuto backup diario (0-59) [15]: " BACKUP_MIN
 BACKUP_MIN="${BACKUP_MIN:-15}"
 
-read -r -p "Frecuencia reporte monitor en horas [6]: " REPORT_EVERY_HOURS
+read -r -p "Frecuencia reporte Adema Core en horas [6]: " REPORT_EVERY_HOURS
 REPORT_EVERY_HOURS="${REPORT_EVERY_HOURS:-6}"
 
 read -r -p "Frecuencia sentinel en minutos [10]: " SENTINEL_EVERY_MIN
@@ -65,13 +65,13 @@ EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
 CLEAN_CRON="$(echo "$EXISTING_CRON" | grep -v 'backup_project.sh' | grep -v 'monitor_report.sh' | grep -v 'sentinel_ram.sh' || true)"
 
 NEW_BLOCK=$(cat <<EOF
-# monitor-django-jobs START
+# adema-core-jobs START
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 $BACKUP_EXPR $BACKUP_CMD
 $REPORT_EXPR $REPORT_CMD
 $SENTINEL_EXPR $SENTINEL_CMD
-# monitor-django-jobs END
+# adema-core-jobs END
 EOF
 )
 

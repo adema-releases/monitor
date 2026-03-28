@@ -65,7 +65,7 @@ STATUS_SCRIPT="$ROOT_DIR/monitor/status_snapshot.sh"
 DELETE_SCRIPT="$ROOT_DIR/monitor/delete_tenant.sh"
 
 cat > "$SUDOERS_FILE" <<EOF
-# Adema Monitor Web Panel - sudoers (autogenerado)
+# Adema Core Web Panel - sudoers (autogenerado)
 # SOLO permite ejecutar scripts especificos como root.
 # El wildcard (*) permite argumentos pero NO subcomandos.
 Defaults:$WEB_USER !requiretty
@@ -80,7 +80,7 @@ visudo -cf "$SUDOERS_FILE" >/dev/null
 
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=Adema Web Control Panel
+Description=Adema Core - Web Control Panel
 After=network.target
 
 [Service]
@@ -112,7 +112,7 @@ PANEL_URL="http://${SERVER_IP}:${WEB_PORT}/"
 PANEL_URL_WITH_TOKEN="${PANEL_URL}?token=${PANEL_TOKEN}"
 
 echo "=================================================="
-echo "Adema Control Center instalado correctamente"
+echo "Adema Core - Control Center instalado correctamente"
 echo "Servicio: adema-web-panel.service"
 echo "URL: ${PANEL_URL}"
 echo "URL (acceso directo): ${PANEL_URL_WITH_TOKEN}"

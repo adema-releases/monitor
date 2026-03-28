@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adema Node | Open Source Infrastructure</title>
+    <title>Adema Core | Open Source Infrastructure</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -15,7 +15,7 @@
                 <div class="bg-indigo-600 text-white p-2 rounded-lg">
                     <i class="fas fa-cubes"></i>
                 </div>
-                <span class="text-xl font-bold tracking-tight text-slate-900">Adema<span class="text-indigo-600">Node</span></span>
+                <span class="text-xl font-bold tracking-tight text-slate-900">Adema<span class="text-indigo-600">Core</span></span>
             </div>
             <nav class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
                 <a href="#quickstart" class="hover:text-indigo-600">Quick Start</a>
@@ -23,7 +23,7 @@
                 <a href="#operaciones" class="hover:text-indigo-600">Operaciones</a>
                 <a href="#docs" class="hover:text-indigo-600">Docs</a>
             </nav>
-            <a href="https://github.com/adema-releases/monitor" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hover:bg-slate-800 transition">
+            <a href="https://github.com/adema-releases/adema-core" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hover:bg-slate-800 transition">
                 <i class="fab fa-github mr-2"></i>Ver en GitHub
             </a>
         </div>
@@ -31,19 +31,19 @@
 
     <main class="max-w-5xl mx-auto px-4 py-12">
         <section class="text-center mb-20">
-            <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Runbook de Nodo <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Adema Monitor</span></h1>
-            <p class="text-lg text-slate-600 max-w-3xl mx-auto">Este proyecto nace para ayudarte a crear una estructura repetible que permita, mediante Coolify, alojar multiples apps Django de forma automatizada, segura y ordenada en VPS.</p>
-            <p class="text-base text-slate-500 max-w-3xl mx-auto mt-3">Piensalo como un runbook para otro desarrollador Django como tu: levantar nodos rapido, reducir errores operativos, cumplir estandares de seguridad y poder dormir tranquilo sabiendo que backups, monitoreo y procedimientos estan definidos.</p>
+            <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Runbook de Nodo <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Adema Core</span></h1>
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto">Adema Core es la capa operativa para estandarizar despliegue, monitoreo y continuidad de apps Django en nodos productivos con Coolify y PostgreSQL.</p>
+            <p class="text-base text-slate-500 max-w-3xl mx-auto mt-3">La vision es operar con criterio de plataforma: procesos repetibles, seguridad por defecto, observabilidad util y recuperacion ante incidentes con backups verificables.</p>
         </section>
 
         <section id="quickstart" class="mb-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
                 <h2 class="text-2xl font-bold">Quick Start: push -> nodo nuevo</h2>
-                <a href="https://github.com/adema-releases/monitor" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
+                <a href="https://github.com/adema-releases/adema-core" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
             </div>
             <p class="text-slate-600 mb-4">Si acabas de hacer push y quieres un bootstrap limpio, estos 3 pasos son el camino corto recomendado.</p>
             <div class="copy-block relative bg-slate-900 text-indigo-300 p-4 pr-14 rounded-xl font-mono text-sm leading-7">
-                git clone https://github.com/adema-releases/monitor<br>
+                git clone https://github.com/adema-releases/adema-core<br>
                 cd monitor && sudo bash run_monitor.sh<br>
                 sudo bash setup_web_panel.sh
             </div>
@@ -234,7 +234,7 @@
                         sudo usermod -aG sudo adema<br>
                         <br>
                         # 2. Clonar el Framework en la ruta correcta (fuera de root)<br>
-                        sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor<br>
+                        sudo -u adema git clone https://github.com/adema-releases/adema-core /home/adema/monitor<br>
                         cd /home/adema/monitor<br>
                         <br>
                         # 3. Lanzar configuracion y panel web<br>
@@ -250,8 +250,8 @@
                                 <ul class="mt-1 list-disc list-inside space-y-1">
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man8/useradd.8.html" target="_blank" rel="noopener noreferrer">useradd/usermod</a>: crea el usuario de operaciones y lo agrega a sudo.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://git-scm.com/docs/git-clone" target="_blank" rel="noopener noreferrer">git clone (sudo -u adema)</a>: descarga el repo con propietario correcto en <span class="font-mono">/home/adema/monitor</span>.</li>
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/run_monitor.sh" target="_blank" rel="noopener noreferrer">run_monitor.sh</a>: asistente CLI de configuracion y tareas diarias.</li>
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/setup_web_panel.sh" target="_blank" rel="noopener noreferrer">setup_web_panel.sh</a>: crea servicio systemd, entorno Python y token del panel.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/run_monitor.sh" target="_blank" rel="noopener noreferrer">run_monitor.sh</a>: asistente CLI de configuracion y tareas diarias.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/setup_web_panel.sh" target="_blank" rel="noopener noreferrer">setup_web_panel.sh</a>: crea servicio systemd, entorno Python y token del panel.</li>
                                 </ul>
                             </div>
                         </div>
@@ -318,7 +318,7 @@
                                 <p><strong>Que hace:</strong> valida salud del nodo, confirma que el servicio web esta activo en systemd y programa tareas recurrentes en cron.</p>
                                 <p class="mt-2"><strong>Herramientas:</strong></p>
                                 <ul class="mt-1 list-disc list-inside space-y-1">
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/monitor/status_snapshot.sh" target="_blank" rel="noopener noreferrer">status_snapshot.sh</a>: resumen tecnico del estado operativo.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/monitor/status_snapshot.sh" target="_blank" rel="noopener noreferrer">status_snapshot.sh</a>: resumen tecnico del estado operativo.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.freedesktop.org/software/systemd/man/systemctl.html" target="_blank" rel="noopener noreferrer">systemctl status</a>: inspeccion de estado del servicio.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man5/crontab.5.html" target="_blank" rel="noopener noreferrer">cron</a>: automatizacion de backups/monitor/sentinel por horario.</li>
                                 </ul>
@@ -351,6 +351,85 @@
                         <li>Restore probado en tenant de staging.</li>
                     </ol>
                 </div>
+            </div>
+        </section>
+
+        <section class="mt-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
+            <h2 class="text-2xl font-bold mb-4">Recuperar Token y Reinstalar Panel</h2>
+            <p class="text-slate-600 mb-4">Guia rapida para incidentes comunes del panel web de Adema Core: token perdido, token vencido o servicio inestable.</p>
+
+            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 mb-2">1) Ver token actual</p>
+                    <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6">
+                        sudo grep '^ADEMA_WEB_TOKEN=' /etc/adema/web_panel.env
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 mb-2">2) Regenerar token</p>
+                    <ul class="list-disc list-inside text-slate-700 space-y-1">
+                        <li>CLI: opcion <span class="font-mono">10) Regenerar token del panel web</span></li>
+                    </ul>
+                    <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6 mt-2">
+                        sudo bash rotate_web_token.sh
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 mb-2">3) Reinstalar/actualizar panel</p>
+                    <ul class="list-disc list-inside text-slate-700 space-y-1">
+                        <li>CLI: opcion <span class="font-mono">11) Instalar/actualizar panel web</span></li>
+                    </ul>
+                    <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6 mt-2">
+                        sudo bash setup_web_panel.sh
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p class="font-semibold text-slate-900 mb-2">4) Reiniciar y validar estado</p>
+                    <ul class="list-disc list-inside text-slate-700 space-y-1">
+                        <li>CLI: opcion <span class="font-mono">12) Reiniciar servicio panel web</span></li>
+                        <li>CLI: opcion <span class="font-mono">13) Ver estado servicio panel web</span></li>
+                    </ul>
+                    <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6 mt-2">
+                        sudo systemctl status adema-web-panel.service
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-200 pt-6">
+                <h3 class="text-lg font-semibold text-slate-900 mb-3">Troubleshooting rapido</h3>
+                <div class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <p class="font-semibold text-amber-900 mb-2">Unauthorized / token invalido</p>
+                        <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6">
+                            sudo grep '^ADEMA_WEB_TOKEN=' /etc/adema/web_panel.env<br>
+                            sudo bash rotate_web_token.sh
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                        <p class="font-semibold text-amber-900 mb-2">Panel caido o sin respuesta</p>
+                        <div class="copy-block relative bg-slate-900 text-indigo-300 p-3 pr-14 rounded-lg font-mono text-xs leading-6">
+                            sudo systemctl status adema-web-panel.service --no-pager<br>
+                            sudo journalctl -u adema-web-panel.service -n 120 --no-pager<br>
+                            sudo ss -lntp | grep ':5000'
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-200 pt-6">
+                <h3 class="text-lg font-semibold text-slate-900 mb-3">Eliminar tenants desde el panel (Papelera)</h3>
+                <p class="text-slate-600 mb-3">El borrado esta protegido por doble confirmacion. Primero se mueve a papelera y recien ahi se puede eliminar de forma definitiva.</p>
+                <ol class="list-decimal list-inside text-slate-700 text-sm space-y-1">
+                    <li>En <strong>Gestion de Tenants</strong>, click en <span class="font-mono">Mover a papelera</span>.</li>
+                    <li>Ir a <strong>Papelera de Tenants</strong> y elegir <span class="font-mono">Borrar definitivo</span>.</li>
+                    <li>Escribir el <span class="font-mono">CLIENT_ID</span> exacto.</li>
+                    <li>Escribir la frase de confirmacion solicitada (default: <span class="font-mono">BORRAR TENANT</span>).</li>
+                    <li>Confirmar y seguir el job en <strong>Logs en tiempo real</strong>.</li>
+                </ol>
             </div>
         </section>
 
@@ -406,13 +485,14 @@
             <h2 class="text-2xl font-bold mb-4">Documentacion Por Tarea</h2>
             <p class="text-slate-600 mb-6">Este index funciona como portal de documentacion. Los links apuntan al repo oficial para que no dependan de rutas locales.</p>
             <ul class="grid md:grid-cols-2 gap-3 text-sm">
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/01-new-node.md" target="_blank" rel="noopener noreferrer">01-new-node.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/02-create-tenant.md" target="_blank" rel="noopener noreferrer">02-create-tenant.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/03-delete-tenant.md" target="_blank" rel="noopener noreferrer">03-delete-tenant.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/04-backup-restore.md" target="_blank" rel="noopener noreferrer">04-backup-restore.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/05-health-and-alerts.md" target="_blank" rel="noopener noreferrer">05-health-and-alerts.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/01-new-node.md" target="_blank" rel="noopener noreferrer">01-new-node.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/02-create-tenant.md" target="_blank" rel="noopener noreferrer">02-create-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/03-delete-tenant.md" target="_blank" rel="noopener noreferrer">03-delete-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/04-backup-restore.md" target="_blank" rel="noopener noreferrer">04-backup-restore.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/05-health-and-alerts.md" target="_blank" rel="noopener noreferrer">05-health-and-alerts.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/08-master-node-federation.md" target="_blank" rel="noopener noreferrer">08-master-node-federation.md</a></li>
             </ul>
         </section>
     </main>

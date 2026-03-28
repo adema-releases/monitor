@@ -31,7 +31,7 @@ done <<< "$STATS_RAW"
 
 if [ -n "$ALERTAS" ]; then
     FECHA_ACTUAL=$(date +'%d/%m/%Y %H:%M')
-    ASUNTO="[URGENTE] $CLUSTER_ID | Saturacion de RAM"
+    ASUNTO="[Adema Core][URGENTE] $CLUSTER_ID | Saturacion de RAM"
 
     BODY_TEXT="ALERTA DE INFRAESTRUCTURA: $CLUSTER_ID\n"
     BODY_TEXT="${BODY_TEXT}Proyecto: $PROJECT_CODE\n"
