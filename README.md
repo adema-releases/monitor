@@ -37,9 +37,18 @@ Guia por tarea en la carpeta `docs/`:
 ```bash
 git clone https://github.com/adema-releases/monitor
 cd monitor
+sudo chmod +x run_monitor.sh setup_cron.sh setup_web_panel.sh monitor/*.sh
 sudo bash run_monitor.sh
 sudo bash setup_web_panel.sh
 ```
+
+Alternativa recomendada para cubrir todos los scripts del repo:
+
+```bash
+sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
+```
+
+El comando `chmod +x` asegura permisos de ejecucion en todos los scripts. Si se clona el repo con permisos alterados, evita errores como `Permission denied`.
 
 Despues valida:
 
@@ -84,7 +93,14 @@ En la VM Linux donde corren los contenedores:
 1. Ejecutar launcher:
 
 ```bash
+sudo chmod +x run_monitor.sh setup_cron.sh setup_web_panel.sh monitor/*.sh
 sudo bash run_monitor.sh
+```
+
+Si quieres asegurar permisos en todos los scripts de forma global:
+
+```bash
+sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
 ```
 
 2. Elegir opcion `1) Configurar variables y secretos`.
@@ -131,6 +147,7 @@ En `monitor/.monitor.env`:
 - `BACKUP_REMOTE`: remote y path base de rclone (ejemplo `r2:miapp-backups`).
 - `BREVO_RECIPIENT`, `BREVO_SENDER`, `BREVO_SENDER_NAME`: datos email.
 - `DB_HOST`: host PostgreSQL para tests.
+- `DB_PORT`: puerto PostgreSQL para tests (default `5432`).
 - `RAM_THRESHOLD_MB`: umbral de alerta RAM.
 
 En `monitor/.monitor.secrets`:

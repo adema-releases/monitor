@@ -78,10 +78,15 @@ sudo usermod -aG sudo adema
 sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor
 cd /home/adema/monitor
 
-# 3. Lanzar configuracion y panel web
+# 3. Asegurar permisos de ejecucion de scripts
+sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
+
+# 4. Lanzar configuracion y panel web
 sudo bash run_monitor.sh
 sudo bash setup_web_panel.sh
 ```
+
+Este comando previene errores `Permission denied` cuando se ejecutan opciones del launcher (por ejemplo reporte/centinela).
 
 En primera ejecucion, `run_monitor.sh` abrira asistente interactivo. Es normal ver prompts como:
 

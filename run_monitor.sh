@@ -5,6 +5,19 @@ SCRIPTS_DIR="$ROOT_DIR/monitor"
 ENV_FILE="$SCRIPTS_DIR/.monitor.env"
 SECRETS_FILE="$SCRIPTS_DIR/.monitor.secrets"
 
+prepare_script_permissions() {
+    # Asegura permisos de ejecucion para TODOS los scripts del repositorio.
+    # Evita errores Permission denied aunque el clone llegue con modos alterados.
+    find "$ROOT_DIR" -type f -name '*.sh' -exec chmod 755 {} \; 2>/dev/null || true
+    echo "Permisos de ejecucion aplicados a todos los scripts .sh del repositorio."
+}
+
+run_script() {
+    local script_path="$1"
+    shift
+    /bin/bash "$script_path" "$@"
+}
+
 ask_value() {
     local label="$1"
     local current="$2"
@@ -131,13 +144,13 @@ EOF
 run_new_client() {
     local client_id
     read -r -p "CLIENT_ID: " client_id
-    "$SCRIPTS_DIR/create_tenant.sh" "$client_id"
+    run_script "$SCRIPTS_DIR/create_tenant.sh" "$client_id"
 }
 
 run_delete_client() {
     local client_id
     read -r -p "CLIENT_ID: " client_id
-    "$SCRIPTS_DIR/delete_tenant.sh" "$client_id"
+    run_script "$SCRIPTS_DIR/delete_tenant.sh" "$client_id"
 }
 
 run_test_db() {
@@ -146,7 +159,7 @@ run_test_db() {
     read -r -p "CLIENT_ID: " client_id
     read -r -s -p "DB_PASSWORD: " db_password
     echo
-    "$SCRIPTS_DIR/test_tenant_db.sh" "$client_id" "$db_password"
+    run_script "$SCRIPTS_DIR/test_tenant_db.sh" "$client_id" "$db_password"
 }
 
 menu() {
@@ -169,12 +182,12 @@ menu() {
             1) configure_environment ;;
             2) run_new_client ;;
             3) run_delete_client ;;
-            4) "$SCRIPTS_DIR/backup_project.sh" ;;
-            5) "$SCRIPTS_DIR/restore_tenant.sh" ;;
+            4) run_script "$SCRIPTS_DIR/backup_project.sh" ;;
+            5) run_script "$SCRIPTS_DIR/restore_tenant.sh" ;;
             6) run_test_db ;;
-            7) "$SCRIPTS_DIR/monitor_report.sh" ;;
-            8) "$SCRIPTS_DIR/sentinel_ram.sh" ;;
-            9) "$ROOT_DIR/setup_cron.sh" ;;
+            7) run_script "$SCRIPTS_DIR/monitor_report.sh" ;;
+            8) run_script "$SCRIPTS_DIR/sentinel_ram.sh" ;;
+            9) run_script "$ROOT_DIR/setup_cron.sh" ;;
             0) exit 0 ;;
             *) echo "Opcion invalida" ;;
         esac
@@ -189,5 +202,7 @@ fi
 if [ "$EUID" -ne 0 ]; then
     echo "Aviso: ejecuta con sudo para operaciones de DB, volumenes y permisos."
 fi
+
+prepare_script_permissions
 
 menu

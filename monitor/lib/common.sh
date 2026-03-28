@@ -78,6 +78,7 @@ load_monitor_env() {
     BREVO_SENDER_NAME="${BREVO_SENDER_NAME:-Monitor Operaciones}"
 
     DB_HOST="${DB_HOST:-172.17.0.1}"
+    DB_PORT="${DB_PORT:-5432}"
     RAM_THRESHOLD_MB="${RAM_THRESHOLD_MB:-450}"
 
     EXCLUDE_CONTAINER_REGEX="${EXCLUDE_CONTAINER_REGEX:-coolify|NAME}"

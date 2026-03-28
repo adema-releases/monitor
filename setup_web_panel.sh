@@ -100,10 +100,13 @@ systemctl enable --now adema-web-panel.service
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 PANEL_TOKEN=$(grep '^ADEMA_WEB_TOKEN=' "$ENV_FILE" | cut -d'=' -f2-)
+PANEL_URL="http://${SERVER_IP}:${WEB_PORT}/"
+PANEL_URL_WITH_TOKEN="${PANEL_URL}?token=${PANEL_TOKEN}"
 
 echo "=================================================="
 echo "Adema Control Center instalado correctamente"
 echo "Servicio: adema-web-panel.service"
-echo "URL: http://${SERVER_IP}:${WEB_PORT}/"
+echo "URL: ${PANEL_URL}"
+echo "URL (acceso directo): ${PANEL_URL_WITH_TOKEN}"
 echo "Token: ${PANEL_TOKEN}"
 echo "=================================================="
