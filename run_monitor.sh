@@ -46,7 +46,7 @@ configure_environment() {
     local brevo_recipient=""
     local brevo_sender=""
     local brevo_sender_name="Adema Core Operaciones"
-    local db_host="172.17.0.1"
+    local db_host="127.0.0.1"
     local ram_threshold_mb="450"
     local exclude_regex="coolify|NAME"
 

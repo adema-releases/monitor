@@ -77,7 +77,7 @@ load_monitor_env() {
     BREVO_SENDER="${BREVO_SENDER:-}"
     BREVO_SENDER_NAME="${BREVO_SENDER_NAME:-Adema Core Operaciones}"
 
-    DB_HOST="${DB_HOST:-172.17.0.1}"
+    DB_HOST="${DB_HOST:-127.0.0.1}"
     DB_PORT="${DB_PORT:-5432}"
     RAM_THRESHOLD_MB="${RAM_THRESHOLD_MB:-450}"
 
