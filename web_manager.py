@@ -78,13 +78,13 @@ def validate_token() -> Optional[Response]:
   if request.path in ["/", "/favicon.ico"]:
         return None
 
-    provided = _extract_token()
-    if provided and hmac.compare_digest(provided, TOKEN):
-        return None
+  provided = _extract_token()
+  if provided and hmac.compare_digest(provided, TOKEN):
+      return None
 
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "unauthorized"}), 401
-    return Response("Unauthorized", status=401)
+  if request.path.startswith("/api/"):
+      return jsonify({"error": "unauthorized"}), 401
+  return Response("Unauthorized", status=401)
 
 
 def _run_snapshot() -> dict:
