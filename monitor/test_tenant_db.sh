@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Uso: ./test_tenant_db.sh cli001 [DB_PASSWORD]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Uso: sudo ./delete_tenant.sh cli001
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,8 +27,8 @@ if [ "$confirm" != "y" ]; then
 fi
 
 echo "Eliminando base de datos y usuario SQL..."
-sudo -u postgres psql -c "DROP DATABASE IF EXISTS $DB_NAME;"
-sudo -u postgres psql -c "DROP USER IF EXISTS $DB_USER;"
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS \"$DB_NAME\";"
+sudo -u postgres psql -c "DROP USER IF EXISTS \"$DB_USER\";"
 
 echo "Eliminando volumenes fisicos en el host..."
 for folder in $VOLUME_FOLDERS; do

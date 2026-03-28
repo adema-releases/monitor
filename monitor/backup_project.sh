@@ -1,14 +1,23 @@
 #!/bin/bash
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/lib/common.sh"
 load_monitor_env
 
+# Verificar espacio en disco antes de continuar
+MIN_FREE_MB="${ADEMA_MIN_BACKUP_FREE_MB:-500}"
+mkdir -p "$BACKUP_DIR"
+AVAIL_KB=$(df --output=avail "$BACKUP_DIR" 2>/dev/null | tail -n1 | tr -d ' ' || echo "0")
+AVAIL_MB=$((AVAIL_KB / 1024))
+if [ "$AVAIL_MB" -lt "$MIN_FREE_MB" ]; then
+    echo "ERROR: Espacio insuficiente en $BACKUP_DIR (${AVAIL_MB}MB libres, minimo ${MIN_FREE_MB}MB)."
+    exit 1
+fi
+
 DATE_FOLDER=$(date +%Y-%m-%d)
 DATE_FILE=$(date +%H-%M)
-
-mkdir -p "$BACKUP_DIR"
 
 echo "Iniciando backup de bases de datos para $PROJECT_CODE..."
 

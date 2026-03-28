@@ -40,6 +40,9 @@ if [ ! -f "$ENV_FILE" ]; then
 ADEMA_WEB_TOKEN=$TOKEN
 ADEMA_WEB_HOST=0.0.0.0
 ADEMA_WEB_PORT=$WEB_PORT
+ADEMA_MAX_JOBS=4
+ADEMA_MIN_BACKUP_FREE_MB=500
+ADEMA_ENV_FILE=$ENV_FILE
 EOF
 fi
 
@@ -61,11 +64,14 @@ BACKUP_SCRIPT="$ROOT_DIR/monitor/backup_project.sh"
 STATUS_SCRIPT="$ROOT_DIR/monitor/status_snapshot.sh"
 
 cat > "$SUDOERS_FILE" <<EOF
+# Adema Monitor Web Panel - sudoers (autogenerado)
+# SOLO permite ejecutar scripts especificos como root.
+# El wildcard (*) permite argumentos pero NO subcomandos.
 Defaults:$WEB_USER !requiretty
-$WEB_USER ALL=(root) NOPASSWD: /bin/bash $STATUS_SCRIPT
+$WEB_USER ALL=(root) NOPASSWD: /bin/bash $STATUS_SCRIPT ""
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $CREATE_SCRIPT *
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $TEST_SCRIPT *
-$WEB_USER ALL=(root) NOPASSWD: /bin/bash $BACKUP_SCRIPT
+$WEB_USER ALL=(root) NOPASSWD: /bin/bash $BACKUP_SCRIPT ""
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -cf "$SUDOERS_FILE" >/dev/null

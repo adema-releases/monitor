@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Uso: sudo ./restore_tenant.sh [CLIENT_ID] [YYYY-MM-DD] [archivo.sql.gz]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

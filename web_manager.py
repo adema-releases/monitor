@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+import hmac
 import json
 import os
 import re
+import shutil
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,12 +26,15 @@ BACKUP_SCRIPT = MONITOR_DIR / "backup_project.sh"
 JOBS_DIR = ROOT_DIR / ".web_jobs"
 JOBS_DIR.mkdir(exist_ok=True)
 
-CLIENT_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+CLIENT_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 DB_PASSWORD_RE = re.compile(r"^[a-zA-Z0-9@#%+=:._-]{8,128}$")
 
 TOKEN = os.getenv("ADEMA_WEB_TOKEN", "").strip()
 HOST = os.getenv("ADEMA_WEB_HOST", "0.0.0.0")
 PORT = int(os.getenv("ADEMA_WEB_PORT", "5000"))
+MAX_CONCURRENT_JOBS = int(os.getenv("ADEMA_MAX_JOBS", "4"))
+MIN_BACKUP_FREE_MB = int(os.getenv("ADEMA_MIN_BACKUP_FREE_MB", "500"))
+ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
 
 if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
@@ -50,6 +56,7 @@ class Job:
 
 jobs: Dict[str, Job] = {}
 jobs_lock = threading.Lock()
+_executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_JOBS, thread_name_prefix="adema-job")
 
 
 def _extract_token() -> str:
@@ -67,7 +74,7 @@ def _extract_token() -> str:
 @app.before_request
 def validate_token() -> Optional[Response]:
     provided = _extract_token()
-    if provided == TOKEN:
+    if provided and hmac.compare_digest(provided, TOKEN):
         return None
 
     if request.path.startswith("/api/"):
@@ -109,7 +116,7 @@ def _enqueue_job(action: str, command: List[str]) -> Job:
         id=job_id,
         action=action,
         created_at=now,
-        status="running",
+        status="queued",
         return_code=None,
         command=command,
         log_path=str(log_path),
@@ -118,8 +125,7 @@ def _enqueue_job(action: str, command: List[str]) -> Job:
     with jobs_lock:
         jobs[job_id] = job
 
-    thread = threading.Thread(target=_run_job_worker, args=(job_id,), daemon=True)
-    thread.start()
+    _executor.submit(_run_job_worker, job_id)
     return job
 
 
@@ -129,10 +135,13 @@ def _run_job_worker(job_id: str) -> None:
     if not job:
         return
 
+    with jobs_lock:
+        job.status = "running"
+
     log_file = Path(job.log_path)
     try:
         with log_file.open("w", encoding="utf-8") as lf:
-            lf.write(f"[INFO] Ejecutando: {' '.join(job.command)}\n")
+            lf.write(f"[INFO] Ejecutando: {job.action} (job_id={job_id})\n")
             lf.flush()
 
             process = Popen(
@@ -327,7 +336,7 @@ def index() -> Response:
           out.textContent += data.chunk;
           out.scrollTop = out.scrollHeight;
         }
-        if (data.status === "running") {
+        if (data.status === "running" || data.status === "queued") {
           setTimeout(pollActiveJob, 1200);
         }
       } catch (err) {
@@ -365,7 +374,10 @@ def index() -> Response:
     });
 
     const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
-    if (tokenFromQuery) setToken(tokenFromQuery);
+    if (tokenFromQuery) {
+      setToken(tokenFromQuery);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     setToken(getToken());
     refreshHealth();
     setInterval(refreshHealth, 15000);
@@ -417,9 +429,51 @@ def api_test_tenant_db() -> Response:
 
 @app.post("/api/backup/now")
 def api_backup_now() -> Response:
+    backup_dir = os.getenv("BACKUP_DIR", "/var/lib/django/backups_locales")
+    try:
+        usage = shutil.disk_usage(backup_dir)
+        free_mb = usage.free // (1024 * 1024)
+        if free_mb < MIN_BACKUP_FREE_MB:
+            return jsonify({
+                "error": f"Espacio insuficiente: {free_mb}MB libres, minimo {MIN_BACKUP_FREE_MB}MB."
+            }), 507
+    except OSError:
+        pass
+
     command = ["sudo", "-n", "/bin/bash", str(BACKUP_SCRIPT)]
     job = _enqueue_job("backup_now", command)
     return jsonify({"ok": True, "job_id": job.id})
+
+
+@app.post("/api/admin/rotate-token")
+def api_rotate_token() -> Response:
+    global TOKEN
+    payload = request.get_json(silent=True) or {}
+    new_token = (payload.get("new_token") or "").strip()
+
+    if len(new_token) < 32:
+        return jsonify({"error": "new_token debe tener al menos 32 caracteres."}), 400
+
+    file_updated = False
+    try:
+        env_path = Path(ENV_FILE_PATH)
+        if env_path.is_file():
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+            for i, line in enumerate(lines):
+                if line.startswith("ADEMA_WEB_TOKEN="):
+                    lines[i] = f"ADEMA_WEB_TOKEN={new_token}"
+            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            file_updated = True
+    except OSError:
+        pass
+
+    TOKEN = new_token
+    msg = "Token rotado en memoria."
+    if file_updated:
+        msg += " Archivo de configuracion actualizado."
+    else:
+        msg += " No se pudo actualizar el archivo; actualice manualmente y reinicie."
+    return jsonify({"ok": True, "message": msg, "file_updated": file_updated})
 
 
 @app.get("/api/jobs")

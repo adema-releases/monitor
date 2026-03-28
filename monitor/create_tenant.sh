@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,12 +31,12 @@ for folder in $VOLUME_FOLDERS; do
     chmod -R 755 "$VOLUME_BASE_PATH/${PREFIX}_$folder"
 done
 
-sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;"
-sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+sudo -u postgres psql -c "CREATE DATABASE \"$DB_NAME\";"
+sudo -u postgres psql -c "CREATE USER \"$DB_USER\" WITH PASSWORD '$(printf '%s' "$DB_PASSWORD" | sed "s/'/''/g")';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO \"$DB_USER\";"
 
-sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE $DB_NAME OWNER TO $DB_USER;"
-sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
+sudo -u postgres psql -d "$DB_NAME" -c "ALTER DATABASE \"$DB_NAME\" OWNER TO \"$DB_USER\";"
+sudo -u postgres psql -d "$DB_NAME" -c "GRANT ALL ON SCHEMA public TO \"$DB_USER\";"
 
 echo "=================================================="
 echo "Infraestructura y DB listas para $CLIENT_ID"
