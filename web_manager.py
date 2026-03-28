@@ -358,8 +358,8 @@ def index() -> Response:
       }
     }
 
-    async function tryLogin() {
-      const t = document.getElementById("tokenInput").value.trim();
+    async function tryLogin(tokenOverride = null) {
+      const t = (tokenOverride ?? document.getElementById("tokenInput").value).trim();
       if (!t) return;
       setToken(t);
       try {
@@ -440,9 +440,9 @@ def index() -> Response:
       setToken(tokenFromQuery);
       window.history.replaceState({}, '', window.location.pathname);
     }
-    if (getToken()) {
-      document.getElementById("tokenInput").value = "••••••••";
-      tryLogin();
+    const storedToken = getToken();
+    if (storedToken) {
+      tryLogin(storedToken);
     }
   </script>
 </body>
