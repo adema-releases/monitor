@@ -32,7 +32,8 @@
     <main class="max-w-5xl mx-auto px-4 py-12">
         <section class="text-center mb-20">
             <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Runbook de Nodo <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Adema Monitor</span></h1>
-            <p class="text-lg text-slate-600 max-w-2xl mx-auto">Guia operativa para provisionar un nodo nuevo, activar monitor + panel web y comenzar a gestionar tenants de forma segura.</p>
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto">Este proyecto nace para ayudarte a crear una estructura repetible que permita, mediante Coolify, alojar multiples apps Django de forma automatizada, segura y ordenada en VPS.</p>
+            <p class="text-base text-slate-500 max-w-3xl mx-auto mt-3">Piensalo como un runbook para otro desarrollador Django como tu: levantar nodos rapido, reducir errores operativos, cumplir estandares de seguridad y poder dormir tranquilo sabiendo que backups, monitoreo y procedimientos estan definidos.</p>
         </section>
 
         <section id="quickstart" class="mb-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
@@ -41,10 +42,39 @@
                 <a href="https://github.com/adema-releases/monitor" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
             </div>
             <p class="text-slate-600 mb-4">Si acabas de hacer push y quieres un bootstrap limpio, estos 3 pasos son el camino corto recomendado.</p>
-            <div class="bg-slate-900 text-indigo-300 p-4 rounded-xl font-mono text-sm leading-7">
+            <div class="copy-block relative bg-slate-900 text-indigo-300 p-4 pr-14 rounded-xl font-mono text-sm leading-7">
                 git clone https://github.com/adema-releases/monitor<br>
                 cd monitor && sudo bash run_monitor.sh<br>
                 sudo bash setup_web_panel.sh
+            </div>
+            <div class="mt-3">
+                <div class="group relative inline-block">
+                    <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                    <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                        <p><strong>Que hace:</strong> clona el repositorio, entra al proyecto, ejecuta el asistente de configuracion y luego instala el panel web con systemd.</p>
+                        <p class="mt-2"><strong>Herramientas usadas:</strong></p>
+                        <ul class="mt-1 list-disc list-inside space-y-1">
+                            <li><a class="text-indigo-700 hover:text-indigo-900" href="https://git-scm.com/docs/git-clone" target="_blank" rel="noopener noreferrer">git clone</a>: descarga el codigo del repo.</li>
+                            <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.gnu.org/software/bash/manual/bash.html" target="_blank" rel="noopener noreferrer">bash</a>: interpreta y ejecuta los scripts shell.</li>
+                            <li><a class="text-indigo-700 hover:text-indigo-900" href="https://wiki.debian.org/systemd" target="_blank" rel="noopener noreferrer">systemd</a>: el panel se publica como servicio para arranque automatico.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+                <p class="font-semibold">Importante (primera ejecucion)</p>
+                <p class="mt-1">No es error si aparece el asistente interactivo con prompts como <span class="font-mono">PROJECT_CODE [django]:</span> o <span class="font-mono">CLUSTER_ID [CLUSTER-DJANGO-01]:</span>. Completa los datos (o presiona Enter para dejar defaults), guarda y luego continua con <span class="font-mono">setup_web_panel.sh</span>.</p>
+            </div>
+            <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700">
+                <p class="font-semibold text-slate-900">Valores base sugeridos para PROD</p>
+                <ul class="mt-2 space-y-1">
+                    <li><span class="font-mono">PROJECT_CODE</span>: django</li>
+                    <li><span class="font-mono">CLUSTER_ID</span>: NODO_001 (o tu patron NODO_XXX)</li>
+                    <li><span class="font-mono">DB_NAME_PREFIX</span>: django_db</li>
+                    <li><span class="font-mono">DB_USER_PREFIX</span>: user_django</li>
+                    <li><span class="font-mono">BACKUP_REMOTE</span>: tu remote rclone real (ej: r2:django-backups)</li>
+                    <li><span class="font-mono">BREVO_RECIPIENT / BREVO_SENDER</span>: correos reales de alertas</li>
+                </ul>
             </div>
             <div class="mt-5 grid md:grid-cols-3 gap-3 text-sm">
                 <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
@@ -68,10 +98,10 @@
             <div class="flex gap-6">
                 <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">1</div>
                 <div>
-                    <h3 class="text-xl font-bold mb-2 text-slate-900">Provision del servidor</h3>
-                    <p class="text-slate-600 mb-4">Usa Ubuntu 24.04 LTS y asegura paquetes base para Docker, PostgreSQL y backups remotos.</p>
-                    <div class="bg-slate-900 text-indigo-300 p-4 rounded-lg font-mono text-sm">
-                        sudo apt update && sudo apt install -y docker.io postgresql postgresql-contrib rclone curl openssl
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Crear el nodo con un patron de nombre</h3>
+                    <p class="text-slate-600 mb-4">Antes de tocar la VM, define un nombre estandar para el nodo. Recomendado: <span class="font-mono">NODO_XXX</span> (ej: <span class="font-mono">NODO_001</span>, <span class="font-mono">NODO_MAD_01</span>). Esto te simplifica inventario, alertas y crecimiento futuro.</p>
+                    <div class="bg-slate-100 border border-slate-200 text-slate-700 p-4 rounded-lg text-sm">
+                        <strong>Tip de estandarizacion:</strong> usa siempre el mismo patron para hostnames, etiquetas de proveedor y nombre interno en Coolify.
                     </div>
                 </div>
             </div>
@@ -79,12 +109,25 @@
             <div class="flex gap-6">
                 <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">2</div>
                 <div>
-                    <h3 class="text-xl font-bold mb-2 text-slate-900">Clonar y configurar monitor</h3>
-                    <p class="text-slate-600 mb-4">Clona el repositorio y ejecuta el launcher para crear .monitor.env y secretos.</p>
-                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
-                        git clone https://github.com/adema-releases/monitor<br>
-                        cd monitor<br>
-                        sudo bash run_monitor.sh
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Abrir la VM y actualizar sistema base</h3>
+                    <p class="text-slate-600 mb-4">Conectate por SSH y ejecuta la puesta a punto inicial de Ubuntu para tener paquetes y parches al dia.</p>
+                    <div class="copy-block relative bg-slate-900 text-indigo-300 p-4 pr-14 rounded-lg font-mono text-sm">
+                        sudo apt update && sudo apt upgrade -y<br>
+                        sudo apt autoremove -y && sudo apt autoclean -y
+                    </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> actualiza indices de paquetes, instala parches pendientes y limpia paquetes/cache para reducir superficie de errores y consumo en disco.</p>
+                                <p class="mt-2"><strong>Comandos:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://manpages.ubuntu.com/manpages/jammy/man8/apt.8.html" target="_blank" rel="noopener noreferrer">apt update</a>: refresca metadatos de repositorios.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://manpages.ubuntu.com/manpages/jammy/man8/apt-get.8.html" target="_blank" rel="noopener noreferrer">apt upgrade</a>: aplica actualizaciones disponibles.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://manpages.ubuntu.com/manpages/jammy/man8/apt-get.8.html" target="_blank" rel="noopener noreferrer">apt autoremove/autoclean</a>: elimina dependencias huerfanas y cache obsoleta.</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -92,10 +135,33 @@
             <div class="flex gap-6">
                 <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">3</div>
                 <div>
-                    <h3 class="text-xl font-bold mb-2 text-slate-900">Activar panel web seguro</h3>
-                    <p class="text-slate-600 mb-4">Instala el puente Flask bajo usuario adema, con token y permisos sudo acotados.</p>
-                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
-                        sudo bash setup_web_panel.sh
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Instalar dependencias base del nodo</h3>
+                    <p class="text-slate-600 mb-4">Instala herramientas minimas para operar el stack y preparar backups/seguridad.</p>
+                    <div class="copy-block relative bg-slate-900 p-4 pr-14 rounded-lg font-mono text-sm text-indigo-300">
+                        # Instalar motor oficial de Docker y Compose V2<br>
+                        curl -fsSL https://get.docker.com | sh<br>
+                        # Instalar resto de dependencias del stack Adema<br>
+                        sudo apt install -y postgresql postgresql-contrib rclone openssl git ufw fail2ban
+                    </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(46rem,94vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> instala Docker Engine oficial (con Compose V2) para compatibilidad con despliegues modernos de Coolify, y luego instala dependencias operativas del nodo.</p>
+                                <p class="mt-2"><strong>Componentes instalados:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://get.docker.com/" target="_blank" rel="noopener noreferrer">get.docker.com</a>: instala Docker Engine oficial sobre Ubuntu.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://docs.docker.com/compose/install/linux/" target="_blank" rel="noopener noreferrer">docker compose (Compose V2)</a>: plugin moderno de orquestacion requerido por stacks actuales.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.postgresql.org/docs/" target="_blank" rel="noopener noreferrer">postgresql</a>: servidor de base de datos relacional.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.postgresql.org/docs/current/contrib.html" target="_blank" rel="noopener noreferrer">postgresql-contrib</a>: extensiones adicionales de PostgreSQL.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://rclone.org/docs/" target="_blank" rel="noopener noreferrer">rclone</a>: sincronizacion de backups a almacenamiento remoto.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.openssl.org/docs/" target="_blank" rel="noopener noreferrer">openssl</a>: utilidades criptograficas y generacion de tokens/certificados.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://git-scm.com/doc" target="_blank" rel="noopener noreferrer">git</a>: control de versiones y despliegue desde repositorio.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://help.ubuntu.com/community/UFW" target="_blank" rel="noopener noreferrer">ufw</a>: firewall simplificado sobre iptables/nftables.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.fail2ban.org/wiki/index.php/Main_Page" target="_blank" rel="noopener noreferrer">fail2ban</a>: bloqueo automatico de intentos de acceso maliciosos.</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -103,13 +169,163 @@
             <div class="flex gap-6">
                 <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">4</div>
                 <div>
-                    <h3 class="text-xl font-bold mb-2 text-slate-900">Validar salud y operaciones</h3>
-                    <p class="text-slate-600 mb-4">Verifica snapshot JSON, servicio web y estado del cron de backups/alertas.</p>
-                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Instalar Coolify en el nodo</h3>
+                    <p class="text-slate-600 mb-4">Instala Coolify y guarda de inmediato las credenciales iniciales en tu gestor de claves.</p>
+                    <div class="copy-block relative bg-slate-900 p-4 pr-14 rounded-lg font-mono text-sm text-indigo-300">
+                        curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+                    </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> descarga el script oficial de instalacion de Coolify y lo ejecuta con bash para aprovisionar el panel y sus servicios.</p>
+                                <p class="mt-2"><strong>Herramientas:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://curl.se/docs/manpage.html" target="_blank" rel="noopener noreferrer">curl -fsSL</a>: descarga silenciosa con fallo explicito ante errores HTTP.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.gnu.org/software/bash/manual/bash.html" target="_blank" rel="noopener noreferrer">bash</a>: ejecuta el script recibido por pipe.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://coolify.io/docs/" target="_blank" rel="noopener noreferrer">Coolify</a>: orquestacion self-hosted para despliegues y operaciones.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700">
+                        <p class="font-semibold text-slate-900">Acceso al panel (paso a paso)</p>
+                        <ol class="mt-2 list-decimal list-inside space-y-1">
+                            <li>Identifica la IP publica del nodo en tu proveedor (o por SSH con <span class="font-mono">curl -4 ifconfig.me</span>).</li>
+                            <li>Abre en navegador la URL que informa el instalador de Coolify. En tu caso, usa <span class="font-mono">http://IP_PUBLICA:3000</span>.</li>
+                            <li>Si no responde, valida firewall/puerto: <span class="font-mono">sudo ufw allow 3000/tcp</span> y vuelve a probar.</li>
+                            <li>Dentro del panel: crea usuario administrador y guarda URL, email, password y token en tu gestor de claves.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">5</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Completar onboarding de Coolify (Server Type)</h3>
+                    <p class="text-slate-600 mb-4">En la nueva version de Coolify, despues del login aparece el asistente inicial. Aqui defines donde se desplegaran apps y bases.</p>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700">
+                        <p class="font-semibold text-slate-900">Que opcion elegir y por que</p>
+                        <ul class="mt-2 list-disc list-inside space-y-1">
+                            <li><strong>This Machine:</strong> despliega en el mismo servidor donde corre Coolify. Es la opcion correcta para tu nodo unico y para este runbook.</li>
+                            <li><strong>Remote Server:</strong> conecta otro servidor por SSH para separar control-plane y workloads.</li>
+                            <li><strong>Hetzner Cloud:</strong> aprovisionamiento directo para cuentas Hetzner.</li>
+                        </ul>
+                    </div>
+                    <div class="mt-4 bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
+                        # En el wizard de Coolify:<br>
+                        1) Seleccionar "This Machine"<br>
+                        2) Continuar con Deploy/Next<br>
+                        3) Click en "Create My First Project"
+                    </div>
+                    <p class="text-slate-600 mt-4">Con esto dejas listo el entorno base dentro de Coolify y ya puedes pasar a conectar repositorio y desplegar.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">6</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Clonar este repo y preparar variables/secretos</h3>
+                    <p class="text-slate-600 mb-4">Con el nodo listo, clona el proyecto y ejecuta el asistente para generar <span class="font-mono">.monitor.env</span> y <span class="font-mono">.monitor.secrets</span>.</p>
+                    <div class="copy-block relative bg-slate-900 p-4 pr-14 rounded-lg font-mono text-sm text-indigo-300">
+                        # 1. Crear el usuario de operaciones y su espacio de trabajo<br>
+                        sudo useradd -m -s /bin/bash adema<br>
+                        sudo usermod -aG sudo adema<br>
+                        <br>
+                        # 2. Clonar el Framework en la ruta correcta (fuera de root)<br>
+                        sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor<br>
+                        cd /home/adema/monitor<br>
+                        <br>
+                        # 3. Lanzar configuracion y panel web<br>
+                        sudo bash run_monitor.sh<br>
+                        sudo bash setup_web_panel.sh
+                    </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> crea un usuario operativo dedicado (<span class="font-mono">adema</span>), clona el framework fuera de <span class="font-mono">root</span> en <span class="font-mono">/home/adema/monitor</span>, ejecuta la configuracion inicial y publica el panel web.</p>
+                                <p class="mt-2"><strong>Componentes:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man8/useradd.8.html" target="_blank" rel="noopener noreferrer">useradd/usermod</a>: crea el usuario de operaciones y lo agrega a sudo.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://git-scm.com/docs/git-clone" target="_blank" rel="noopener noreferrer">git clone (sudo -u adema)</a>: descarga el repo con propietario correcto en <span class="font-mono">/home/adema/monitor</span>.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/run_monitor.sh" target="_blank" rel="noopener noreferrer">run_monitor.sh</a>: asistente CLI de configuracion y tareas diarias.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/setup_web_panel.sh" target="_blank" rel="noopener noreferrer">setup_web_panel.sh</a>: crea servicio systemd, entorno Python y token del panel.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700">
+                        <h4 class="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">Primera ejecucion de run_monitor.sh (referencia prod)</h4>
+                        <p>Si estas configurando el nodo NODO-001-GDC por primera vez, puedes usar estos valores cuando el asistente te pregunte variable por variable.</p>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="w-full text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-left text-slate-500">
+                                        <th class="py-2 pr-4">Prompt</th>
+                                        <th class="py-2 pr-4">Valor sugerido</th>
+                                        <th class="py-2">Razon tecnica</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-slate-700 align-top">
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">PROJECT_CODE</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Estandariza naming de proyecto en todo el nodo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">CLUSTER_ID</td><td class="py-2 pr-4 font-mono text-indigo-700">CLUSTER-GDC-01</td><td class="py-2">Identificador unico del nodo para inventario y alertas.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Uniforma nombre logico de bases y recursos.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_NAME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">ad_db</td><td class="py-2">Prefijo interno de DB para separar entornos.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_USER_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adm_</td><td class="py-2">Prefijo de usuarios SQL consistente y auditable.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_BASE_PATH</td><td class="py-2 pr-4">Presionar Enter</td><td class="py-2">Mantiene path estandar de Docker.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Ordena volumenes por marca/proyecto.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_FOLDERS</td><td class="py-2 pr-4">Presionar Enter</td><td class="py-2">Conserva defaults recomendados: license logs media.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_DIR</td><td class="py-2 pr-4 font-mono text-indigo-700">/var/lib/adema/backups_locales</td><td class="py-2">Ubicacion segura para dumps locales.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_RETENTION_DAYS</td><td class="py-2 pr-4 font-mono text-indigo-700">30</td><td class="py-2">Retencion corporativa mas robusta que 7 dias.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_REMOTE</td><td class="py-2 pr-4 font-mono text-indigo-700">do:cluster-gdc-01</td><td class="py-2">Remote de DigitalOcean Spaces para continuidad.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_RECIPIENT</td><td class="py-2 pr-4 font-mono text-indigo-700">ademasistemas@gmail.com</td><td class="py-2">Buzon central de monitoreo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER</td><td class="py-2 pr-4 font-mono text-indigo-700">notificaciones@gestiondecreditos.app</td><td class="py-2">Sender profesional para alertas.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER_NAME</td><td class="py-2 pr-4 font-mono text-indigo-700">Notificaciones GDC - No responder</td><td class="py-2">Identificacion clara del origen de correo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_HOST</td><td class="py-2 pr-4 font-mono text-indigo-700">172.17.0.1</td><td class="py-2">Bridge de Docker para alcanzar host PostgreSQL.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">RAM_THRESHOLD_MB</td><td class="py-2 pr-4 font-mono text-indigo-700">450</td><td class="py-2">Alerta temprana para evitar degradacion por memoria.</td></tr>
+                                    <tr><td class="py-2 pr-4 font-mono">EXCLUDE_CONTAINER_REGEX</td><td class="py-2 pr-4 font-mono text-indigo-700">coolify|NAME</td><td class="py-2">Evita ruido monitoreando contenedores de sistema.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 grid md:grid-cols-2 gap-4 text-xs font-mono">
+                            <div class="text-slate-500">BACKUP_REMOTE:</div><div class="text-indigo-700 font-bold">do:cluster-gdc-01</div>
+                            <div class="text-slate-500">DB_PREFIX:</div><div class="text-indigo-700 font-bold">adema</div>
+                            <div class="text-slate-500">DB_HOST:</div><div class="text-indigo-700 font-bold">172.17.0.1</div>
+                            <div class="text-slate-500">RETENTION:</div><div class="text-indigo-700 font-bold">30 days</div>
+                        </div>
+                        <p class="mt-4 text-xs text-slate-600"><strong>Nota:</strong> cuando pida <span class="font-mono">BREVO_API_KEY</span>, pega tu clave real de Brevo (no se muestra en pantalla).</p>
+                    </div>
+                    <p class="text-slate-600 mt-4">Momento clave para guardar credenciales: password de DB de tenants, token del panel web (ADEMA_WEB_TOKEN), API key de Brevo y cualquier token de backup remoto.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">7</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Enlazar tu repositorio en Coolify y validar</h3>
+                    <p class="text-slate-600 mb-4">En Coolify: Sources -> Add Source (GitHub/GitLab) -> autorizar acceso al repo -> crear recurso de app Django. Luego valida salud del nodo.</p>
+                    <div class="copy-block relative bg-slate-900 p-4 pr-14 rounded-lg font-mono text-sm text-indigo-300">
                         bash monitor/status_snapshot.sh<br>
                         sudo systemctl status adema-web-panel.service<br>
                         sudo bash setup_cron.sh
                     </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> valida salud del nodo, confirma que el servicio web esta activo en systemd y programa tareas recurrentes en cron.</p>
+                                <p class="mt-2"><strong>Herramientas:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/monitor/status_snapshot.sh" target="_blank" rel="noopener noreferrer">status_snapshot.sh</a>: resumen tecnico del estado operativo.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.freedesktop.org/software/systemd/man/systemctl.html" target="_blank" rel="noopener noreferrer">systemctl status</a>: inspeccion de estado del servicio.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man5/crontab.5.html" target="_blank" rel="noopener noreferrer">cron</a>: automatizacion de backups/monitor/sentinel por horario.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 mt-4">Si todo esta OK, ya tienes un nodo estandarizado y repetible para alojar multiples proyectos Django.</p>
                 </div>
             </div>
         </section>
@@ -204,6 +420,31 @@
     <footer class="mt-20 border-t border-slate-200 py-12 text-center text-slate-500 text-sm">
         &copy; 2026 Adema Sistemas. Built for the community by Kevin Turkienich.
     </footer>
+
+    <script>
+        document.querySelectorAll('.copy-block').forEach(function (block) {
+            var copyText = block.innerText.trim();
+            block.setAttribute('data-copy-text', copyText);
+
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'absolute top-2 right-2 rounded-md border border-indigo-400/40 bg-indigo-500/20 px-2 py-1 text-[11px] font-semibold text-indigo-100 hover:bg-indigo-500/35 transition';
+            button.textContent = 'Copy';
+
+            button.addEventListener('click', function () {
+                var text = block.getAttribute('data-copy-text') || '';
+                navigator.clipboard.writeText(text).then(function () {
+                    var original = button.textContent;
+                    button.textContent = 'Copied';
+                    setTimeout(function () {
+                        button.textContent = original;
+                    }, 1200);
+                });
+            });
+
+            block.appendChild(button);
+        });
+    </script>
 
 </body>
 </html>

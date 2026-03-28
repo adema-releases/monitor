@@ -2,6 +2,8 @@
 
 Esta carpeta contiene guias practicas para operar el nodo de forma segura y repetible.
 
+La idea principal del proyecto es crear una estructura que permita, mediante Coolify, alojar multiples apps Django de manera automatizada sobre VPS. Esta documentacion esta escrita para que otro desarrollador Django pueda levantar un nodo rapido, con estandares de seguridad y procesos claros.
+
 ## Indice
 
 1. [Provision y bootstrap del nodo](01-new-node.md)
@@ -17,3 +19,4 @@ Esta carpeta contiene guias practicas para operar el nodo de forma segura y repe
 - Ejecuta comandos desde la raiz del repo.
 - Para operaciones de DB, volumenes y permisos, usa `sudo`.
 - Antes de producir cambios destructivos, confirma en entorno de staging.
+- Para nuevos nodos, usa un patron de nombre (`NODO_XXX`) para estandarizar inventario y operacion futura.

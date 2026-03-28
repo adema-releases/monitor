@@ -25,7 +25,11 @@ else
 fi
 
 if ! id -u "$WEB_USER" >/dev/null 2>&1; then
-    useradd --system --create-home --shell /bin/bash "$WEB_USER"
+    useradd -m -s /bin/bash "$WEB_USER"
+fi
+
+if ! id -nG "$WEB_USER" | grep -qw sudo; then
+    usermod -aG sudo "$WEB_USER"
 fi
 
 mkdir -p "$ENV_DIR"
@@ -80,10 +84,11 @@ EnvironmentFile=$ENV_FILE
 ExecStart=$VENV_DIR/bin/python $ROOT_DIR/web_manager.py
 Restart=on-failure
 RestartSec=2
-NoNewPrivileges=true
+# Cambios de seguridad para permitir ejecucion en /home
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=full
-ProtectHome=true
+ProtectHome=false
 ReadWritePaths=$ROOT_DIR/.web_jobs
 
 [Install]
