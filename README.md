@@ -239,6 +239,15 @@ Menu:
 
 ## Recuperar token y reinstalar panel web
 
+Si el panel no inicia por dependencia faltante (`No module named flask_limiter`), ejecutar:
+
+```bash
+/home/adema/monitor/.venv_web_panel/bin/pip install flask-limiter
+sudo systemctl restart adema-web-panel.service
+```
+
+Para guia completa de troubleshooting ver `docs/06-web-panel.md`.
+
 ### Ver token actual
 
 ```bash

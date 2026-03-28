@@ -49,6 +49,7 @@ MIN_BACKUP_FREE_MB = int(os.getenv("ADEMA_MIN_BACKUP_FREE_MB", "500"))
 SNAPSHOT_TIMEOUT_SEC = int(os.getenv("ADEMA_SNAPSHOT_TIMEOUT_SEC", "12"))
 ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
 DELETE_CONFIRM_TEXT = (os.getenv("ADEMA_DELETE_CONFIRM_TEXT", "BORRAR TENANT") or "BORRAR TENANT").strip()
+MONITOR_ENV_PATH = Path(os.getenv("MONITOR_ENV_FILE", str(MONITOR_DIR / ".monitor.env"))).resolve()
 
 if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
@@ -322,6 +323,85 @@ def _generate_db_password() -> str:
     return secrets.token_urlsafe(18).replace("-", "A").replace("_", "B")[:24]
 
 
+def _load_monitor_env_values() -> Dict[str, str]:
+  values: Dict[str, str] = {}
+  if not MONITOR_ENV_PATH.is_file():
+    return values
+
+  try:
+    lines = MONITOR_ENV_PATH.read_text(encoding="utf-8").splitlines()
+  except OSError:
+    return values
+
+  for raw in lines:
+    line = raw.strip().rstrip("\r")
+    if not line or line.startswith("#") or "=" not in line:
+      continue
+
+    key, value = line.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+      continue
+
+    if len(value) >= 2 and ((value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'")):
+      value = value[1:-1]
+
+    values[key] = value
+
+  return values
+
+
+def _detect_docker0_ip() -> str:
+  try:
+    result = run(
+      ["ip", "-o", "-4", "addr", "show", "docker0"],
+      cwd=str(ROOT_DIR),
+      capture_output=True,
+      text=True,
+      check=False,
+      timeout=3,
+    )
+  except (OSError, TimeoutExpired):
+    return ""
+
+  if result.returncode != 0:
+    return ""
+
+  line = (result.stdout or "").strip().splitlines()
+  if not line:
+    return ""
+
+  parts = line[0].split()
+  if len(parts) < 4:
+    return ""
+
+  return parts[3].split("/", 1)[0].strip()
+
+
+def _build_connection_bundle(client_id: str, db_password: str) -> Dict[str, str]:
+  env_values = _load_monitor_env_values()
+  project_code = env_values.get("PROJECT_CODE") or "django"
+  db_prefix = env_values.get("DB_PREFIX") or project_code
+  db_name_prefix = env_values.get("DB_NAME_PREFIX") or f"{db_prefix}_db"
+  db_user_prefix = env_values.get("DB_USER_PREFIX") or f"user_{db_prefix}"
+  db_port = (env_values.get("DB_PORT") or "5432").strip() or "5432"
+
+  db_host = _detect_docker0_ip()
+  if not db_host:
+    db_host = (env_values.get("DB_HOST") or "").strip() or "127.0.0.1"
+
+  return {
+    "project_code": project_code,
+    "client_id": client_id,
+    "db_host": db_host,
+    "db_port": db_port,
+    "db_name": f"{db_name_prefix}_{client_id}",
+    "db_user": f"{db_user_prefix}_{client_id}",
+    "db_password": db_password,
+  }
+
+
 def _enqueue_job(action: str, command: List[str], safe_command: Optional[List[str]] = None) -> Job:
     job_id = uuid.uuid4().hex[:12]
     log_path = JOBS_DIR / f"{job_id}.log"
@@ -535,6 +615,23 @@ def index() -> Response:
       </div>
     </div>
 
+    <div id="connectionInfoModal" class="hidden fixed inset-0 z-50 bg-black/50 p-4">
+      <div class="max-w-xl mx-auto mt-16 md:mt-24 bg-white rounded-2xl shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200">
+          <h3 class="text-xl font-black text-slate-900">Credenciales de Conexion</h3>
+          <p class="text-sm text-slate-600 mt-1">Guarda este dato ahora. No se mostrara nuevamente en el historial.</p>
+        </div>
+        <div class="p-5 space-y-3">
+          <p class="text-sm text-slate-700">Tenant: <span id="connectionClientId" class="font-bold">-</span></p>
+          <textarea id="connectionInfoText" readonly class="w-full h-52 border rounded-xl px-3 py-2 text-sm font-mono text-slate-800 bg-slate-50"></textarea>
+        </div>
+        <div class="p-5 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button id="downloadConnectionBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Descargar .txt</button>
+          <button id="closeConnectionBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-4 py-2 font-semibold">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -546,6 +643,7 @@ def index() -> Response:
     let requireDeleteClientId = true;
     let lastHealthData = null;
     let pendingDeleteClientId = null;
+    let connectionBundle = null;
 
     const loginSection = document.getElementById("loginSection");
     const panelSection = document.getElementById("panelSection");
@@ -557,6 +655,51 @@ def index() -> Response:
     const deletePhraseHint = document.getElementById("deletePhraseHint");
     const deleteModalError = document.getElementById("deleteModalError");
     const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    const connectionInfoModal = document.getElementById("connectionInfoModal");
+    const connectionClientId = document.getElementById("connectionClientId");
+    const connectionInfoText = document.getElementById("connectionInfoText");
+
+    function buildConnectionText(bundle) {
+      return [
+        "Adema Core - Datos de conexion tenant",
+        "====================================",
+        `CLIENT_ID=${bundle.client_id || ""}`,
+        `DB_HOST=${bundle.db_host || ""}`,
+        `DB_PORT=${bundle.db_port || "5432"}`,
+        `DB_NAME=${bundle.db_name || ""}`,
+        `DB_USER=${bundle.db_user || ""}`,
+        `DB_PASSWORD=${bundle.db_password || ""}`,
+      ].join("\n");
+    }
+
+    function closeConnectionModal() {
+      connectionBundle = null;
+      connectionInfoText.value = "";
+      connectionClientId.textContent = "-";
+      connectionInfoModal.classList.add("hidden");
+    }
+
+    function openConnectionModal(bundle) {
+      if (!bundle) return;
+      connectionBundle = bundle;
+      connectionClientId.textContent = bundle.client_id || "-";
+      connectionInfoText.value = buildConnectionText(bundle);
+      connectionInfoModal.classList.remove("hidden");
+    }
+
+    function downloadConnectionTxt() {
+      if (!connectionBundle) return;
+      const filenameBase = (connectionBundle.client_id || "tenant").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const blob = new Blob([buildConnectionText(connectionBundle) + "\n"], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${filenameBase}_db_connection.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
 
     function getToken() {
       return localStorage.getItem("adema_token") || "";
@@ -884,8 +1027,8 @@ def index() -> Response:
         body: JSON.stringify(payload)
       });
 
-      if (resp.db_password_once) {
-        alert(`DB_PASSWORD generada para ${clientId}: ${resp.db_password_once}\n\nGuardala ahora. No se mostrara otra vez.`);
+      if (resp.connection_bundle) {
+        openConnectionModal(resp.connection_bundle);
       }
 
       activateJob(resp.job_id);
@@ -910,6 +1053,11 @@ def index() -> Response:
     });
     deleteTenantModal.addEventListener("click", (e) => {
       if (e.target === deleteTenantModal) closeDeleteModal();
+    });
+    document.getElementById("downloadConnectionBtn").addEventListener("click", downloadConnectionTxt);
+    document.getElementById("closeConnectionBtn").addEventListener("click", closeConnectionModal);
+    connectionInfoModal.addEventListener("click", (e) => {
+      if (e.target === connectionInfoModal) closeConnectionModal();
     });
 
     // Auto-login si hay token guardado o en la URL
@@ -952,12 +1100,10 @@ def api_create_tenant() -> Response:
     try:
         client_id = _ensure_client_id(payload.get("client_id", ""))
         db_password = (payload.get("db_password") or "").strip()
-        generated_password: Optional[str] = None
         if db_password:
             db_password = _ensure_password(db_password)
         else:
-            generated_password = _ensure_password(_generate_db_password())
-            db_password = generated_password
+      db_password = _ensure_password(_generate_db_password())
 
         command = [
             "sudo",
@@ -970,7 +1116,13 @@ def api_create_tenant() -> Response:
         ]
 
         job = _enqueue_job("create_tenant", command)
-        return jsonify({"ok": True, "job_id": job.id, "db_password_once": generated_password})
+        bundle = _build_connection_bundle(client_id, db_password)
+        return jsonify({
+            "ok": True,
+            "job_id": job.id,
+            "db_password_once": db_password,
+            "connection_bundle": bundle,
+        })
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

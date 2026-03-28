@@ -178,6 +178,26 @@ sudo bash setup_web_panel.sh
 sudo systemctl restart adema-web-panel.service
 ```
 
+### Error de dependencia: `No module named flask_limiter`
+
+Si el servicio no levanta despues de actualizar y en `journalctl` aparece un error similar a:
+
+- `ModuleNotFoundError: No module named 'flask_limiter'`
+
+instala la dependencia en el virtualenv del panel y reinicia el servicio:
+
+```bash
+/home/adema/monitor/.venv_web_panel/bin/pip install flask-limiter
+sudo systemctl restart adema-web-panel.service
+sudo journalctl -u adema-web-panel.service -n 80 --no-pager
+```
+
+Alternativa recomendada (reaplica instalador completo):
+
+```bash
+sudo bash setup_web_panel.sh
+```
+
 ### El backend responde pero falla crear/borrar tenant
 
 Suele ser permisos de sudoers fuera de sincronia:
