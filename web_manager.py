@@ -61,10 +61,10 @@ logging.basicConfig(
 )
 
 limiter = Limiter(
-    key_func=get_remote_address,
-    app=app,
-    default_limits=[],
-    storage_uri=os.getenv("ADEMA_RATE_LIMIT_STORAGE", "memory://"),
+  get_remote_address,
+  app=app,
+  default_limits=[],
+  storage_uri=os.getenv("ADEMA_RATE_LIMIT_STORAGE", "memory://"),
 )
 
 
@@ -106,11 +106,11 @@ def validate_token() -> Optional[Response]:
 
   provided = _extract_token()
   if provided and hmac.compare_digest(provided, TOKEN):
-      return None
+    return None
 
   app.logger.warning("Intento no autorizado a %s desde ip=%s", request.path, request.remote_addr)
   if request.path.startswith("/api/"):
-      return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"error": "unauthorized"}), 401
   return Response("Unauthorized", status=401)
 
 
@@ -668,7 +668,7 @@ def index() -> Response:
         `DB_NAME=${bundle.db_name || ""}`,
         `DB_USER=${bundle.db_user || ""}`,
         `DB_PASSWORD=${bundle.db_password || ""}`,
-      ].join("\n");
+      ].join("\\n");
     }
 
     function closeConnectionModal() {
@@ -689,7 +689,7 @@ def index() -> Response:
     function downloadConnectionTxt() {
       if (!connectionBundle) return;
       const filenameBase = (connectionBundle.client_id || "tenant").replace(/[^a-zA-Z0-9_-]/g, "_");
-      const blob = new Blob([buildConnectionText(connectionBundle) + "\n"], { type: "text/plain;charset=utf-8" });
+      const blob = new Blob([buildConnectionText(connectionBundle) + "\\n"], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
