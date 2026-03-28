@@ -1103,7 +1103,7 @@ def api_create_tenant() -> Response:
         if db_password:
             db_password = _ensure_password(db_password)
         else:
-      db_password = _ensure_password(_generate_db_password())
+            db_password = _ensure_password(_generate_db_password())
 
         command = [
             "sudo",
