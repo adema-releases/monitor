@@ -175,3 +175,21 @@ Luego programa tareas operativas:
 ```bash
 sudo bash setup_cron.sh
 ```
+
+## 9. Ajuste de autenticacion PostgreSQL para redes Docker/Coolify
+
+Si tus apps en contenedores obtienen IPs del segmento interno `10.0.x.x`, agrega una regla de acceso en `pg_hba.conf` para evitar rechazos de autenticacion.
+
+```bash
+# Autoriza red interna Docker/Coolify con SCRAM
+echo "host    all             all             10.0.0.0/16            scram-sha-256" | sudo tee -a /etc/postgresql/16/main/pg_hba.conf
+```
+
+Aplica y valida cambios:
+
+```bash
+sudo systemctl restart postgresql
+sudo ss -nltp | grep 5432
+```
+
+Nota: ajusta el CIDR si tu red interna real es distinta a `10.0.0.0/16`.

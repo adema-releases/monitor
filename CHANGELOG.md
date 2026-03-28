@@ -4,6 +4,22 @@ Todos los cambios relevantes de este proyecto se documentan aqui.
 
 ## Unreleased
 
+## 1.0.2 - 2026-03-28
+
+### Security
+
+- Se documenta hardening de `pg_hba.conf` para redes internas Docker/Coolify con autenticacion `scram-sha-256`.
+- Se incorpora procedimiento de reinicio y validacion de PostgreSQL tras cambios de capa de autenticacion.
+
+### Changed
+
+- Se formaliza el flujo de alta de tenants cuando la red de contenedores usa segmento `10.0.0.0/16`.
+
+### Docs
+
+- Nuevo changelist detallado en `CHANGESET-1.0.2.md`.
+- Actualizadas guias operativas de bootstrap y alta de tenant con comandos de `pg_hba.conf`.
+
 ## 1.0.1 - 2026-03-28
 
 ### Security

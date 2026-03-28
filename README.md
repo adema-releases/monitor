@@ -13,6 +13,7 @@ Proyecto listo para uso publico con:
 - Guia de contribucion: `CONTRIBUTING.md`
 - Codigo de conducta: `CODE_OF_CONDUCT.md`
 - Historial de cambios: `CHANGELOG.md`
+- Roadmap de mejoras futuras: `README-FUTURAS-MEJORAS.md`
 
 ## Documentacion Operativa
 
