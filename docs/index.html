@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adema Node | Open Source Infrastructure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+
+    <header class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                    <i class="fas fa-cubes"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-slate-900">Adema<span class="text-indigo-600">Node</span></span>
+            </div>
+            <nav class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
+                <a href="#quickstart" class="hover:text-indigo-600">Quick Start</a>
+                <a href="#guia" class="hover:text-indigo-600">Paso a Paso</a>
+                <a href="#operaciones" class="hover:text-indigo-600">Operaciones</a>
+                <a href="#docs" class="hover:text-indigo-600">Docs</a>
+            </nav>
+            <a href="https://github.com/adema-releases/monitor" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hover:bg-slate-800 transition">
+                <i class="fab fa-github mr-2"></i>Ver en GitHub
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-12">
+        <section class="text-center mb-20">
+            <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Runbook de Nodo <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Adema Monitor</span></h1>
+            <p class="text-lg text-slate-600 max-w-2xl mx-auto">Guia operativa para provisionar un nodo nuevo, activar monitor + panel web y comenzar a gestionar tenants de forma segura.</p>
+        </section>
+
+        <section id="quickstart" class="mb-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+                <h2 class="text-2xl font-bold">Quick Start: push -> nodo nuevo</h2>
+                <a href="https://github.com/adema-releases/monitor" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
+            </div>
+            <p class="text-slate-600 mb-4">Si acabas de hacer push y quieres un bootstrap limpio, estos 3 pasos son el camino corto recomendado.</p>
+            <div class="bg-slate-900 text-indigo-300 p-4 rounded-xl font-mono text-sm leading-7">
+                git clone https://github.com/adema-releases/monitor<br>
+                cd monitor && sudo bash run_monitor.sh<br>
+                sudo bash setup_web_panel.sh
+            </div>
+            <div class="mt-5 grid md:grid-cols-3 gap-3 text-sm">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                    <p class="font-semibold text-emerald-800">Salida esperada</p>
+                    <p class="text-emerald-700 mt-1">URL del panel + token ADEMA_WEB_TOKEN</p>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <p class="font-semibold text-amber-800">Precondicion</p>
+                    <p class="text-amber-700 mt-1">Servidor Ubuntu con Docker, PostgreSQL y rclone</p>
+                </div>
+                <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-3">
+                    <p class="font-semibold text-cyan-800">Validacion minima</p>
+                    <p class="text-cyan-700 mt-1">bash monitor/status_snapshot.sh devuelve JSON valido</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="guia" class="space-y-12">
+            <h2 class="text-3xl font-bold border-b pb-4 border-slate-200">Guia de Nodo Nuevo (MVP)</h2>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">1</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Provision del servidor</h3>
+                    <p class="text-slate-600 mb-4">Usa Ubuntu 24.04 LTS y asegura paquetes base para Docker, PostgreSQL y backups remotos.</p>
+                    <div class="bg-slate-900 text-indigo-300 p-4 rounded-lg font-mono text-sm">
+                        sudo apt update && sudo apt install -y docker.io postgresql postgresql-contrib rclone curl openssl
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">2</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Clonar y configurar monitor</h3>
+                    <p class="text-slate-600 mb-4">Clona el repositorio y ejecuta el launcher para crear .monitor.env y secretos.</p>
+                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
+                        git clone https://github.com/adema-releases/monitor<br>
+                        cd monitor<br>
+                        sudo bash run_monitor.sh
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">3</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Activar panel web seguro</h3>
+                    <p class="text-slate-600 mb-4">Instala el puente Flask bajo usuario adema, con token y permisos sudo acotados.</p>
+                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
+                        sudo bash setup_web_panel.sh
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">4</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Validar salud y operaciones</h3>
+                    <p class="text-slate-600 mb-4">Verifica snapshot JSON, servicio web y estado del cron de backups/alertas.</p>
+                    <div class="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-300">
+                        bash monitor/status_snapshot.sh<br>
+                        sudo systemctl status adema-web-panel.service<br>
+                        sudo bash setup_cron.sh
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="operaciones" class="mt-24 bg-indigo-900 rounded-3xl p-8 text-white">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold mb-6">Operaciones Diarias</h2>
+                    <ul class="space-y-4 text-indigo-100">
+                        <li class="flex gap-3"><i class="fas fa-check-circle text-indigo-400 mt-1"></i> <strong>Alta tenant:</strong> sudo bash monitor/create_tenant.sh cli001</li>
+                        <li class="flex gap-3"><i class="fas fa-check-circle text-indigo-400 mt-1"></i> <strong>Test DB:</strong> bash monitor/test_tenant_db.sh cli001</li>
+                        <li class="flex gap-3"><i class="fas fa-check-circle text-indigo-400 mt-1"></i> <strong>Backup:</strong> sudo bash monitor/backup_project.sh</li>
+                        <li class="flex gap-3"><i class="fas fa-check-circle text-indigo-400 mt-1"></i> <strong>Restore:</strong> sudo bash monitor/restore_tenant.sh cli001 YYYY-MM-DD archivo.sql.gz</li>
+                        <li class="flex gap-3"><i class="fas fa-check-circle text-indigo-400 mt-1"></i> <strong>Centinela RAM:</strong> sudo bash monitor/sentinel_ram.sh</li>
+                    </ul>
+                </div>
+                <div class="bg-indigo-800 p-6 rounded-2xl border border-indigo-700 shadow-xl">
+                    <h3 class="text-lg font-semibold mb-3">Checklist de Produccion</h3>
+                    <ol class="text-sm text-indigo-100 space-y-2 list-decimal list-inside">
+                        <li>Token del panel guardado en ubicacion segura.</li>
+                        <li>Firewall restringiendo puerto 5000 o acceso por VPN.</li>
+                        <li>Cron activo para backup, monitor report y sentinel.</li>
+                        <li>Restore probado en tenant de staging.</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
+            <h2 class="text-2xl font-bold mb-4">Matriz de Operaciones Criticas</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-left text-slate-500">
+                            <th class="py-2">Operacion</th>
+                            <th class="py-2">Comando</th>
+                            <th class="py-2">Validacion</th>
+                            <th class="py-2">Riesgo</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-slate-700">
+                        <tr class="border-b">
+                            <td class="py-2 font-semibold">Crear tenant</td>
+                            <td class="py-2 font-mono">sudo bash monitor/create_tenant.sh cli001</td>
+                            <td class="py-2">bash monitor/test_tenant_db.sh cli001</td>
+                            <td class="py-2">Bajo</td>
+                        </tr>
+                        <tr class="border-b">
+                            <td class="py-2 font-semibold">Backup</td>
+                            <td class="py-2 font-mono">sudo bash monitor/backup_project.sh</td>
+                            <td class="py-2">Ver *_latest.sql.gz y remote</td>
+                            <td class="py-2">Medio</td>
+                        </tr>
+                        <tr class="border-b">
+                            <td class="py-2 font-semibold">Restore</td>
+                            <td class="py-2 font-mono">sudo bash monitor/restore_tenant.sh ...</td>
+                            <td class="py-2">Test DB + smoke test app</td>
+                            <td class="py-2">Alto</td>
+                        </tr>
+                        <tr class="border-b">
+                            <td class="py-2 font-semibold">Eliminar tenant</td>
+                            <td class="py-2 font-mono">sudo bash monitor/delete_tenant.sh cli001</td>
+                            <td class="py-2">Confirmar backups previos</td>
+                            <td class="py-2">Critico</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 font-semibold">Sentinela RAM</td>
+                            <td class="py-2 font-mono">sudo bash monitor/sentinel_ram.sh</td>
+                            <td class="py-2">Recepcion de alerta por email</td>
+                            <td class="py-2">Bajo</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="docs" class="mt-20 bg-white rounded-2xl p-8 border border-slate-200">
+            <h2 class="text-2xl font-bold mb-4">Documentacion Por Tarea</h2>
+            <p class="text-slate-600 mb-6">Este index funciona como portal de documentacion. Los links apuntan al repo oficial para que no dependan de rutas locales.</p>
+            <ul class="grid md:grid-cols-2 gap-3 text-sm">
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/01-new-node.md" target="_blank" rel="noopener noreferrer">01-new-node.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/02-create-tenant.md" target="_blank" rel="noopener noreferrer">02-create-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/03-delete-tenant.md" target="_blank" rel="noopener noreferrer">03-delete-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/04-backup-restore.md" target="_blank" rel="noopener noreferrer">04-backup-restore.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/05-health-and-alerts.md" target="_blank" rel="noopener noreferrer">05-health-and-alerts.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
+            </ul>
+        </section>
+    </main>
+
+    <footer class="mt-20 border-t border-slate-200 py-12 text-center text-slate-500 text-sm">
+        &copy; 2026 Adema Sistemas. Built for the community by Kevin Turkienich.
+    </footer>
+
+</body>
+</html>

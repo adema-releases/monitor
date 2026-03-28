@@ -1,0 +1,11 @@
+# Local secrets and node-specific config
+monitor/.monitor.secrets
+monitor/.monitor.env
+
+# Web panel runtime artifacts
+.web_jobs/
+.venv_web_panel/
+
+# Common local noise
+*.log
+.DS_Store
