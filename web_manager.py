@@ -23,9 +23,11 @@ STATUS_SCRIPT = MONITOR_DIR / "status_snapshot.sh"
 CREATE_SCRIPT = MONITOR_DIR / "create_tenant.sh"
 TEST_DB_SCRIPT = MONITOR_DIR / "test_tenant_db.sh"
 BACKUP_SCRIPT = MONITOR_DIR / "backup_project.sh"
+DELETE_SCRIPT = MONITOR_DIR / "delete_tenant.sh"
 
 JOBS_DIR = ROOT_DIR / ".web_jobs"
 JOBS_DIR.mkdir(exist_ok=True)
+TRASH_FILE = ROOT_DIR / ".tenant_trash.json"
 
 CLIENT_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 DB_PASSWORD_RE = re.compile(r"^[a-zA-Z0-9@#%+=:._-]{8,128}$")
@@ -37,6 +39,7 @@ MAX_CONCURRENT_JOBS = int(os.getenv("ADEMA_MAX_JOBS", "4"))
 MIN_BACKUP_FREE_MB = int(os.getenv("ADEMA_MIN_BACKUP_FREE_MB", "500"))
 SNAPSHOT_TIMEOUT_SEC = int(os.getenv("ADEMA_SNAPSHOT_TIMEOUT_SEC", "12"))
 ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
+DELETE_CONFIRM_TEXT = (os.getenv("ADEMA_DELETE_CONFIRM_TEXT", "BORRAR TENANT") or "BORRAR TENANT").strip()
 
 if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
@@ -58,6 +61,7 @@ class Job:
 
 jobs: Dict[str, Job] = {}
 jobs_lock = threading.Lock()
+trash_lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_JOBS, thread_name_prefix="adema-job")
 
 
@@ -110,6 +114,143 @@ def _run_snapshot() -> dict:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"JSON invalido en status_snapshot: {exc}") from exc
+
+
+def _load_trash_items_unlocked() -> List[dict]:
+    if not TRASH_FILE.exists():
+        return []
+
+    try:
+        payload = json.loads(TRASH_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    items = payload.get("items", []) if isinstance(payload, dict) else []
+    if not isinstance(items, list):
+        return []
+
+    sanitized: List[dict] = []
+    for row in items:
+        if not isinstance(row, dict):
+            continue
+        client_id = (row.get("client_id") or "").strip()
+        if not CLIENT_ID_RE.fullmatch(client_id):
+            continue
+        sanitized.append(
+            {
+                "client_id": client_id,
+                "db_name": (row.get("db_name") or "").strip(),
+                "moved_at": (row.get("moved_at") or "").strip(),
+                "delete_job_id": (row.get("delete_job_id") or "").strip(),
+                "delete_requested_at": (row.get("delete_requested_at") or "").strip(),
+            }
+        )
+    return sanitized
+
+
+def _save_trash_items_unlocked(items: List[dict]) -> None:
+    payload = {"items": items}
+    tmp_path = TRASH_FILE.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(TRASH_FILE)
+
+
+def _reconcile_trash_items_unlocked(items: List[dict]) -> List[dict]:
+    changed = False
+    result: List[dict] = []
+    for item in items:
+        delete_job_id = (item.get("delete_job_id") or "").strip()
+        if not delete_job_id:
+            result.append(item)
+            continue
+
+        with jobs_lock:
+            job = jobs.get(delete_job_id)
+
+        if job and job.status == "success":
+            changed = True
+            continue
+
+        if job and job.status == "failed":
+            item = dict(item)
+            item["delete_job_id"] = ""
+            item["delete_requested_at"] = ""
+            changed = True
+
+        result.append(item)
+
+    if changed:
+        _save_trash_items_unlocked(result)
+    return result
+
+
+def _list_trash_items() -> List[dict]:
+    with trash_lock:
+        items = _load_trash_items_unlocked()
+        items = _reconcile_trash_items_unlocked(items)
+    return sorted(items, key=lambda x: x.get("moved_at", ""), reverse=True)
+
+
+def _move_tenant_to_trash(client_id: str, db_name: str) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    with trash_lock:
+        items = _load_trash_items_unlocked()
+        for item in items:
+            if item.get("client_id") == client_id:
+                item["db_name"] = db_name or item.get("db_name", "")
+                item["moved_at"] = now
+                item["delete_job_id"] = ""
+                item["delete_requested_at"] = ""
+                _save_trash_items_unlocked(items)
+                return item
+
+        item = {
+            "client_id": client_id,
+            "db_name": db_name,
+            "moved_at": now,
+            "delete_job_id": "",
+            "delete_requested_at": "",
+        }
+        items.append(item)
+        _save_trash_items_unlocked(items)
+        return item
+
+
+def _restore_tenant_from_trash(client_id: str) -> bool:
+    with trash_lock:
+        items = _load_trash_items_unlocked()
+        kept: List[dict] = []
+        restored = False
+        for item in items:
+            if item.get("client_id") != client_id:
+                kept.append(item)
+                continue
+
+            if item.get("delete_job_id"):
+                kept.append(item)
+                continue
+
+            restored = True
+
+        if restored:
+            _save_trash_items_unlocked(kept)
+        return restored
+
+
+def _mark_trash_delete_requested(client_id: str, job_id: str) -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    with trash_lock:
+        items = _load_trash_items_unlocked()
+        found = False
+        for item in items:
+            if item.get("client_id") == client_id:
+                item["delete_job_id"] = job_id
+                item["delete_requested_at"] = now
+                found = True
+                break
+        if found:
+            _save_trash_items_unlocked(items)
+        return found
 
 
 def _ensure_client_id(client_id: str) -> str:
@@ -264,6 +405,28 @@ def index() -> Response:
             <tbody id="tenantsBody"></tbody>
           </table>
         </div>
+        <p class="text-xs text-slate-500">Mover a papelera oculta el tenant de esta tabla. El borrado definitivo se hace desde Papelera con confirmacion reforzada.</p>
+      </section>
+
+      <section class="panel bg-amber-50/90 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-bold text-amber-900">Papelera de Tenants</h2>
+          <span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">doble seguridad</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-amber-900/70 border-b border-amber-200">
+                <th class="py-2">CLIENT_ID</th>
+                <th class="py-2">DB</th>
+                <th class="py-2">Movido</th>
+                <th class="py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="trashBody"></tbody>
+          </table>
+        </div>
+        <p class="text-xs text-amber-800">Para borrar definitivo se debe escribir la frase exacta solicitada por el sistema.</p>
       </section>
 
       <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-3">
@@ -291,6 +454,10 @@ def index() -> Response:
     let activeJobId = null;
     let activeOffset = 0;
     let healthInterval = null;
+    let trashedClientIds = new Set();
+    let deleteConfirmText = "BORRAR TENANT";
+    let requireDeleteClientId = true;
+    let lastHealthData = null;
 
     const loginSection = document.getElementById("loginSection");
     const panelSection = document.getElementById("panelSection");
@@ -331,19 +498,27 @@ def index() -> Response:
       return res.json();
     }
 
-    function renderHealth(data) {
-      const host = data.host || {};
-      document.getElementById("hostName").textContent = host.hostname || "-";
-      const ram = host.ram || {};
-      document.getElementById("ramUsage").textContent = `${ram.used_mb || 0} / ${ram.total_mb || 0} MB`;
-      document.getElementById("diskUsage").textContent = host.disk_root_usage || "-";
-      const containers = data.containers || {};
-      document.getElementById("containersCount").textContent = containers.running || 0;
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
 
-      const rows = (data.databases || []).map((db) => {
-        const cid = db.client_id || "";
-        return `<tr class="border-b border-slate-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${db.db_name}</td><td class="py-2"><button class="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-1 rounded test-db" data-client="${cid}">Test DB</button></td></tr>`;
+    function renderTenantsTable() {
+      const databases = (lastHealthData?.databases || []).filter((db) => {
+        const cid = (db.client_id || "").trim();
+        return cid && !trashedClientIds.has(cid);
+      });
+
+      const rows = databases.map((db) => {
+        const cid = escapeHtml(db.client_id || "");
+        const dbName = escapeHtml(db.db_name || "");
+        return `<tr class="border-b border-slate-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2 flex flex-wrap gap-2"><button class="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-1 rounded test-db" data-client="${cid}">Test DB</button><button class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded move-trash" data-client="${cid}" data-db="${dbName}">Mover a papelera</button></td></tr>`;
       }).join("");
+
       document.getElementById("tenantsBody").innerHTML = rows || '<tr><td colspan="3" class="py-3 text-slate-500">No hay tenants detectados.</td></tr>';
 
       document.querySelectorAll(".test-db").forEach((btn) => {
@@ -358,6 +533,100 @@ def index() -> Response:
           activateJob(resp.job_id);
         });
       });
+
+      document.querySelectorAll(".move-trash").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const clientId = btn.dataset.client;
+          const dbName = btn.dataset.db || "";
+          const ok = confirm(`Se movera ${clientId} a la papelera. No se borra aun. Continuar?`);
+          if (!ok) return;
+          await api("/api/tenant/trash", {
+            method: "POST",
+            body: JSON.stringify({ client_id: clientId, db_name: dbName })
+          });
+          await refreshTrash();
+          renderTenantsTable();
+        });
+      });
+    }
+
+    function renderTrash(items) {
+      const rows = (items || []).map((item) => {
+        const cid = escapeHtml(item.client_id || "");
+        const dbName = escapeHtml(item.db_name || "-");
+        const moved = item.moved_at ? new Date(item.moved_at).toLocaleString("es-AR") : "-";
+        const status = item.delete_job_id
+          ? `<span class="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded">eliminando...</span>`
+          : "";
+        return `<tr class="border-b border-amber-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2">${escapeHtml(moved)}</td><td class="py-2 flex flex-wrap gap-2"><button class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded restore-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Restaurar</button><button class="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded delete-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Borrar definitivo</button>${status}</td></tr>`;
+      }).join("");
+
+      document.getElementById("trashBody").innerHTML = rows || '<tr><td colspan="4" class="py-3 text-amber-800/70">La papelera esta vacia.</td></tr>';
+
+      document.querySelectorAll(".restore-tenant").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const clientId = btn.dataset.client;
+          await api("/api/tenant/restore", {
+            method: "POST",
+            body: JSON.stringify({ client_id: clientId })
+          });
+          await refreshTrash();
+          renderTenantsTable();
+        });
+      });
+
+      document.querySelectorAll(".delete-tenant").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const clientId = btn.dataset.client;
+          const phrase = prompt(`Para eliminar definitivamente ${clientId}, escribe exactamente: ${deleteConfirmText}`);
+          if (!phrase) return;
+          if (phrase.trim() !== deleteConfirmText) {
+            alert(`Frase incorrecta. Debes escribir exactamente: ${deleteConfirmText}`);
+            return;
+          }
+          const confirmDelete = confirm(`Ultima confirmacion: eliminar definitivamente ${clientId}. Esta accion NO se puede deshacer.`);
+          if (!confirmDelete) return;
+
+          let confirmClientId = clientId;
+          if (requireDeleteClientId) {
+            const clientText = prompt(`Confirma el CLIENT_ID escribiendolo exactamente: ${clientId}`);
+            if (!clientText) return;
+            if (clientText.trim() !== clientId) {
+              alert("CLIENT_ID incorrecto. Se cancelo el borrado definitivo.");
+              return;
+            }
+            confirmClientId = clientText.trim();
+          }
+
+          const resp = await api("/api/tenant/delete-permanent", {
+            method: "POST",
+            body: JSON.stringify({ client_id: clientId, confirm_text: phrase.trim(), confirm_client_id: confirmClientId })
+          });
+          await refreshTrash();
+          activateJob(resp.job_id);
+        });
+      });
+    }
+
+    function renderHealth(data) {
+      lastHealthData = data;
+      const host = data.host || {};
+      document.getElementById("hostName").textContent = host.hostname || "-";
+      const ram = host.ram || {};
+      document.getElementById("ramUsage").textContent = `${ram.used_mb || 0} / ${ram.total_mb || 0} MB`;
+      document.getElementById("diskUsage").textContent = host.disk_root_usage || "-";
+      const containers = data.containers || {};
+      document.getElementById("containersCount").textContent = containers.running || 0;
+      renderTenantsTable();
+    }
+
+    async function refreshTrash() {
+      const data = await api("/api/tenant/trash");
+      const items = data.items || [];
+      deleteConfirmText = (data.confirm_text || "BORRAR TENANT").trim() || "BORRAR TENANT";
+      requireDeleteClientId = data.require_client_id !== false;
+      trashedClientIds = new Set(items.map((item) => (item.client_id || "").trim()).filter(Boolean));
+      renderTrash(items);
     }
 
     async function refreshHealth() {
@@ -377,7 +646,24 @@ def index() -> Response:
         document.getElementById("ramUsage").textContent = "-";
         document.getElementById("diskUsage").textContent = "-";
         document.getElementById("containersCount").textContent = "-";
+        document.getElementById("tenantsBody").innerHTML = '<tr><td colspan="3" class="py-3 text-slate-500">Sin datos de backend.</td></tr>';
       }
+    }
+
+    async function refreshPanelData() {
+      await refreshHealth();
+      try {
+        await refreshTrash();
+      } catch (err) {
+        if (err.status === 401) {
+          localStorage.removeItem("adema_token");
+          showLogin();
+          loginError.classList.remove("hidden");
+          loginError.textContent = "Sesion expirada o token invalido.";
+          return;
+        }
+      }
+      renderTenantsTable();
     }
 
     async function tryLogin(tokenOverride = null) {
@@ -387,8 +673,8 @@ def index() -> Response:
       try {
         await api("/api/auth/check");
         showPanel();
-        await refreshHealth();
-        healthInterval = setInterval(refreshHealth, 15000);
+        await refreshPanelData();
+        healthInterval = setInterval(refreshPanelData, 15000);
       } catch (err) {
         localStorage.removeItem("adema_token");
         loginError.classList.remove("hidden");
@@ -420,6 +706,8 @@ def index() -> Response:
         }
         if (data.status === "running" || data.status === "queued") {
           setTimeout(pollActiveJob, 1200);
+        } else {
+          setTimeout(refreshPanelData, 800);
         }
       } catch (err) {
         document.getElementById("jobStatus").textContent = "error leyendo log";
@@ -449,7 +737,7 @@ def index() -> Response:
       });
 
       activateJob(resp.job_id);
-      setTimeout(refreshHealth, 3000);
+      setTimeout(refreshPanelData, 3000);
     });
 
     document.getElementById("backupBtn").addEventListener("click", async () => {
@@ -520,6 +808,62 @@ def api_test_tenant_db() -> Response:
         return jsonify({"ok": True, "job_id": job.id})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.get("/api/tenant/trash")
+def api_tenant_trash() -> Response:
+    items = _list_trash_items()
+    return jsonify({"items": items, "confirm_text": DELETE_CONFIRM_TEXT, "require_client_id": True})
+
+
+@app.post("/api/tenant/trash")
+def api_move_tenant_to_trash() -> Response:
+    payload = request.get_json(silent=True) or {}
+    try:
+        client_id = _ensure_client_id(payload.get("client_id", ""))
+        db_name = (payload.get("db_name") or "").strip()
+        item = _move_tenant_to_trash(client_id, db_name)
+        return jsonify({"ok": True, "item": item})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.post("/api/tenant/restore")
+def api_restore_tenant_from_trash() -> Response:
+    payload = request.get_json(silent=True) or {}
+    try:
+        client_id = _ensure_client_id(payload.get("client_id", ""))
+        if _restore_tenant_from_trash(client_id):
+            return jsonify({"ok": True})
+        return jsonify({"error": "tenant_no_encontrado_en_papelera_o_en_borrado"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.post("/api/tenant/delete-permanent")
+def api_delete_tenant_permanent() -> Response:
+    payload = request.get_json(silent=True) or {}
+    try:
+        client_id = _ensure_client_id(payload.get("client_id", ""))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    confirm_text = (payload.get("confirm_text") or "").strip()
+    if confirm_text != DELETE_CONFIRM_TEXT:
+        return jsonify({"error": f"confirmacion_invalida. Debe escribir exactamente: {DELETE_CONFIRM_TEXT}"}), 400
+
+    confirm_client_id = _ensure_client_id(payload.get("confirm_client_id", ""))
+    if confirm_client_id != client_id:
+      return jsonify({"error": "confirmacion_client_id_invalida. Debe escribir el CLIENT_ID exacto."}), 400
+
+    items = _list_trash_items()
+    if not any(item.get("client_id") == client_id for item in items):
+        return jsonify({"error": "tenant_no_esta_en_papelera"}), 409
+
+    command = ["sudo", "-n", "/bin/bash", str(DELETE_SCRIPT), client_id, "--force"]
+    job = _enqueue_job("delete_tenant_permanent", command)
+    _mark_trash_delete_requested(client_id, job.id)
+    return jsonify({"ok": True, "job_id": job.id})
 
 
 @app.post("/api/backup/now")
