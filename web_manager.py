@@ -73,6 +73,11 @@ def _extract_token() -> str:
 
 @app.before_request
 def validate_token() -> Optional[Response]:
+    # La pagina principal es HTML estatico sin datos sensibles;
+    # los datos se obtienen via /api/* que SI requiere token.
+    if request.path == "/":
+        return None
+
     provided = _extract_token()
     if provided and hmac.compare_digest(provided, TOKEN):
         return None
