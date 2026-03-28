@@ -3,13 +3,60 @@
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MONITOR_DIR="$(cd "$COMMON_DIR/.." && pwd)"
 
+load_env_file() {
+    local env_file="$1"
+    local line
+    local key
+    local value
+
+    [ -f "$env_file" ] || return 0
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Soportar archivos con fin de linea CRLF
+        line="${line%$'\r'}"
+
+        # Ignorar lineas vacias o comentarios
+        case "$line" in
+            ''|'#'*)
+                continue
+                ;;
+        esac
+
+        if [[ "$line" != *=* ]]; then
+            continue
+        fi
+
+        key="${line%%=*}"
+        value="${line#*=}"
+
+        # Limpiar espacios alrededor de la clave y el valor
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+
+        # Validar nombre de variable para evitar parseos ambiguos
+        if [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            continue
+        fi
+
+        # Remover comillas envolventes simples o dobles
+        if [ "${#value}" -ge 2 ]; then
+            if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+                value="${value:1:${#value}-2}"
+            elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+                value="${value:1:${#value}-2}"
+            fi
+        fi
+
+        printf -v "$key" '%s' "$value"
+        export "$key"
+    done < "$env_file"
+}
+
 load_monitor_env() {
     local env_file="${MONITOR_ENV_FILE:-$MONITOR_DIR/.monitor.env}"
 
-    if [ -f "$env_file" ]; then
-        # shellcheck source=/dev/null
-        . "$env_file"
-    fi
+    load_env_file "$env_file"
 
     PROJECT_CODE="${PROJECT_CODE:-django}"
     CLUSTER_ID="${CLUSTER_ID:-CLUSTER-LOCAL}"
@@ -36,10 +83,7 @@ load_monitor_env() {
     EXCLUDE_CONTAINER_REGEX="${EXCLUDE_CONTAINER_REGEX:-coolify|NAME}"
     SECRETS_FILE="${SECRETS_FILE:-$MONITOR_DIR/.monitor.secrets}"
 
-    if [ -f "$SECRETS_FILE" ]; then
-        # shellcheck source=/dev/null
-        . "$SECRETS_FILE"
-    fi
+    load_env_file "$SECRETS_FILE"
 }
 
 db_name() {

@@ -118,6 +118,9 @@ chmod 600 monitor/.monitor.secrets
 
 En `monitor/.monitor.env`:
 
+- Usa comillas dobles cuando el valor tenga espacios o caracteres especiales de shell (por ejemplo `|`).
+- Ejemplos: `BREVO_SENDER_NAME="Monitor Operaciones"` y `EXCLUDE_CONTAINER_REGEX="coolify|NAME"`.
+
 - `PROJECT_CODE`: codigo del proyecto (ejemplo `miapp`).
 - `CLUSTER_ID`: identificador del cluster/nodo.
 - `DB_NAME_PREFIX`: prefijo de DB (ejemplo `miapp_db`).

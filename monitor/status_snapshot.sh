@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 load_monitor_env
 
 json_escape() {
-    python3 -c 'import json, sys; print(json.dumps(sys.stdin.read())[1:-1], end="")' <<<"$1"
+    python3 -c 'import json, sys; print(json.dumps(sys.argv[1])[1:-1], end="")' "$1"
 }
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
