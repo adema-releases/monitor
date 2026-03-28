@@ -10,14 +10,15 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from subprocess import PIPE, STDOUT, Popen, run
+from subprocess import PIPE, STDOUT, Popen, TimeoutExpired, run
 from typing import Dict, List, Optional
 
 from flask import Flask, jsonify, request, Response
 
 
 ROOT_DIR = Path(__file__).resolve().parent
-MONITOR_DIR = ROOT_DIR / "monitor"
+# Ruta absoluta esperada en produccion; permite override por variable de entorno.
+MONITOR_DIR = Path(os.getenv("ADEMA_MONITOR_DIR", "/home/adema/monitor/monitor")).resolve()
 STATUS_SCRIPT = MONITOR_DIR / "status_snapshot.sh"
 CREATE_SCRIPT = MONITOR_DIR / "create_tenant.sh"
 TEST_DB_SCRIPT = MONITOR_DIR / "test_tenant_db.sh"
@@ -34,6 +35,7 @@ HOST = os.getenv("ADEMA_WEB_HOST", "0.0.0.0")
 PORT = int(os.getenv("ADEMA_WEB_PORT", "5000"))
 MAX_CONCURRENT_JOBS = int(os.getenv("ADEMA_MAX_JOBS", "4"))
 MIN_BACKUP_FREE_MB = int(os.getenv("ADEMA_MIN_BACKUP_FREE_MB", "500"))
+SNAPSHOT_TIMEOUT_SEC = int(os.getenv("ADEMA_SNAPSHOT_TIMEOUT_SEC", "12"))
 ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
 
 if not TOKEN:
@@ -75,21 +77,32 @@ def _extract_token() -> str:
 def validate_token() -> Optional[Response]:
     # La pagina principal es HTML estatico sin datos sensibles;
     # los datos se obtienen via /api/* que SI requiere token.
-  if request.path in ["/", "/favicon.ico"]:
+    if request.path in ["/", "/favicon.ico"]:
         return None
 
-  provided = _extract_token()
-  if provided and hmac.compare_digest(provided, TOKEN):
-      return None
+    provided = _extract_token()
+    if provided and hmac.compare_digest(provided, TOKEN):
+        return None
 
-  if request.path.startswith("/api/"):
-      return jsonify({"error": "unauthorized"}), 401
-  return Response("Unauthorized", status=401)
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "unauthorized"}), 401
+    return Response("Unauthorized", status=401)
 
 
 def _run_snapshot() -> dict:
     cmd = ["sudo", "-n", "/bin/bash", str(STATUS_SCRIPT)]
-    result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=25)
+    try:
+        result = run(
+            cmd,
+            cwd=str(ROOT_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=SNAPSHOT_TIMEOUT_SEC,
+        )
+    except TimeoutExpired as exc:
+        raise RuntimeError(f"status_snapshot timeout tras {SNAPSHOT_TIMEOUT_SEC}s") from exc
+
     if result.returncode != 0:
         raise RuntimeError(f"status_snapshot fallo: {result.stderr.strip()}")
 
@@ -353,6 +366,7 @@ def index() -> Response:
         renderHealth(data);
       } catch (err) {
         if (err.status === 401) {
+          localStorage.removeItem("adema_token");
           showLogin();
           loginError.classList.remove("hidden");
           loginError.textContent = "Sesion expirada o token invalido.";
