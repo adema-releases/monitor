@@ -7,14 +7,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 load_monitor_env
 
-CLIENT_ID="$1"
+CLIENT_ID="${1:-}"
 
 if ! ensure_client_id "$CLIENT_ID"; then
     echo "Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD]"
     exit 1
 fi
 
-DB_PASSWORD="$2"
+DB_PASSWORD="${2:-}"
 if [ -z "$DB_PASSWORD" ]; then
     DB_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 16)
 fi

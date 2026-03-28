@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 load_monitor_env
 
-CLIENT_ID="$1"
+CLIENT_ID="${1:-}"
 
 if ! ensure_client_id "$CLIENT_ID"; then
     echo "Uso: sudo ./delete_tenant.sh cli001"

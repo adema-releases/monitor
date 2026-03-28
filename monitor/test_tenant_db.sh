@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 load_monitor_env
 
-CLIENT_ID="$1"
+CLIENT_ID="${1:-}"
 
 if ! ensure_client_id "$CLIENT_ID"; then
     echo "Uso: ./test_tenant_db.sh cli001 [DB_PASSWORD]"
@@ -16,7 +16,7 @@ fi
 
 DB_NAME=$(db_name "$CLIENT_ID")
 DB_USER=$(db_user "$CLIENT_ID")
-DB_PASS="$2"
+DB_PASS="${2:-}"
 
 if [ -z "$DB_PASS" ]; then
     read -r -s -p "Ingrese DB_PASSWORD para $DB_USER: " DB_PASS

@@ -7,9 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 load_monitor_env
 
-CLIENT_ID="$1"
-FECHA="$2"
-FILE_NAME="$3"
+CLIENT_ID="${1:-}"
+FECHA="${2:-}"
+FILE_NAME="${3:-}"
 
 if [ -z "$CLIENT_ID" ]; then
     read -r -p "Ingrese CLIENT_ID (ej: cli005): " CLIENT_ID
