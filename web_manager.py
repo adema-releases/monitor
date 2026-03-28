@@ -75,7 +75,7 @@ def _extract_token() -> str:
 def validate_token() -> Optional[Response]:
     # La pagina principal es HTML estatico sin datos sensibles;
     # los datos se obtienen via /api/* que SI requiere token.
-    if request.path == "/":
+  if request.path in ["/", "/favicon.ico"]:
         return None
 
     provided = _extract_token()
@@ -311,7 +311,9 @@ def index() -> Response:
       const res = await fetch(path, Object.assign({}, options, { headers }));
       if (!res.ok) {
         const err = await res.text();
-        throw new Error(err || `HTTP ${res.status}`);
+        const e = new Error(err || `HTTP ${res.status}`);
+        e.status = res.status;
+        throw e;
       }
       return res.json();
     }
@@ -350,11 +352,17 @@ def index() -> Response:
         const data = await api("/api/health");
         renderHealth(data);
       } catch (err) {
-        if (err.message.includes("401")) {
+        if (err.status === 401) {
           showLogin();
           loginError.classList.remove("hidden");
           loginError.textContent = "Sesion expirada o token invalido.";
+          return;
         }
+
+        document.getElementById("hostName").textContent = "error de backend";
+        document.getElementById("ramUsage").textContent = "-";
+        document.getElementById("diskUsage").textContent = "-";
+        document.getElementById("containersCount").textContent = "-";
       }
     }
 
@@ -363,14 +371,18 @@ def index() -> Response:
       if (!t) return;
       setToken(t);
       try {
-        const data = await api("/api/health");
+        await api("/api/auth/check");
         showPanel();
-        renderHealth(data);
+        await refreshHealth();
         healthInterval = setInterval(refreshHealth, 15000);
       } catch (err) {
         localStorage.removeItem("adema_token");
         loginError.classList.remove("hidden");
-        loginError.textContent = "Token invalido. Verifica e intenta de nuevo.";
+        if (err.status === 401) {
+          loginError.textContent = "Token invalido. Verifica e intenta de nuevo.";
+        } else {
+          loginError.textContent = "Autenticacion OK pero fallo backend. Revisa sudoers/servicio.";
+        }
       }
     }
 
@@ -458,6 +470,12 @@ def api_health() -> Response:
         return jsonify(snapshot)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.get("/api/auth/check")
+def api_auth_check() -> Response:
+  # Si el request llega aqui, el token ya fue validado en before_request.
+  return jsonify({"ok": True})
 
 
 @app.post("/api/tenant/create")
