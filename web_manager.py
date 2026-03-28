@@ -116,6 +116,14 @@ def _run_snapshot() -> dict:
         raise RuntimeError(f"JSON invalido en status_snapshot: {exc}") from exc
 
 
+def _can_run_delete_without_password() -> bool:
+    # Valida que el usuario del servicio pueda ejecutar delete_tenant.sh via sudo sin password.
+    # Evitamos encolar un job que sabemos que fallara por permisos.
+    cmd = ["sudo", "-n", "-l", "/bin/bash", str(DELETE_SCRIPT)]
+    result = run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True, check=False, timeout=6)
+    return result.returncode == 0
+
+
 def _load_trash_items_unlocked() -> List[dict]:
     if not TRASH_FILE.exists():
         return []
@@ -461,6 +469,7 @@ def index() -> Response:
           <input id="confirmClientIdInput" class="w-full border rounded-xl px-3 py-2" placeholder="cli001" autocomplete="off" />
 
           <label class="block text-sm font-semibold text-slate-700" for="confirmPhraseInput">Escribe la frase de confirmacion</label>
+          <p class="text-xs text-slate-600">Escriba la siguiente frase: <span id="deletePhraseHint" class="font-bold text-slate-900">BORRAR TENANT</span></p>
           <input id="confirmPhraseInput" class="w-full border rounded-xl px-3 py-2" placeholder="BORRAR TENANT" autocomplete="off" />
 
           <p id="deleteModalError" class="text-sm text-red-600 hidden"></p>
@@ -491,6 +500,7 @@ def index() -> Response:
     const deleteTenantTarget = document.getElementById("deleteTenantTarget");
     const confirmClientIdInput = document.getElementById("confirmClientIdInput");
     const confirmPhraseInput = document.getElementById("confirmPhraseInput");
+    const deletePhraseHint = document.getElementById("deletePhraseHint");
     const deleteModalError = document.getElementById("deleteModalError");
     const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 
@@ -561,8 +571,10 @@ def index() -> Response:
     function openDeleteModal(clientId) {
       pendingDeleteClientId = clientId;
       deleteTenantTarget.textContent = clientId;
+      deletePhraseHint.textContent = deleteConfirmText;
       confirmClientIdInput.value = "";
       confirmPhraseInput.value = "";
+      confirmPhraseInput.placeholder = deleteConfirmText;
       clearDeleteModalError();
       deleteTenantModal.classList.remove("hidden");
       setTimeout(() => confirmClientIdInput.focus(), 0);
@@ -704,6 +716,8 @@ def index() -> Response:
       const data = await api("/api/tenant/trash");
       const items = data.items || [];
       deleteConfirmText = (data.confirm_text || "BORRAR TENANT").trim() || "BORRAR TENANT";
+      deletePhraseHint.textContent = deleteConfirmText;
+      confirmPhraseInput.placeholder = deleteConfirmText;
       requireDeleteClientId = data.require_client_id !== false;
       trashedClientIds = new Set(items.map((item) => (item.client_id || "").trim()).filter(Boolean));
       renderTrash(items);
@@ -951,6 +965,14 @@ def api_delete_tenant_permanent() -> Response:
     items = _list_trash_items()
     if not any(item.get("client_id") == client_id for item in items):
         return jsonify({"error": "tenant_no_esta_en_papelera"}), 409
+
+    if not _can_run_delete_without_password():
+      return jsonify(
+        {
+          "error": "Permisos incompletos para borrar tenant. Ejecuta una vez: sudo bash /home/adema/monitor/setup_web_panel.sh",
+          "error_code": "delete_sudoers_missing",
+        }
+      ), 503
 
     command = ["sudo", "-n", "/bin/bash", str(DELETE_SCRIPT), client_id, "--force"]
     job = _enqueue_job("delete_tenant_permanent", command)
