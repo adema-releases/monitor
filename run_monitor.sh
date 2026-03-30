@@ -48,6 +48,7 @@ configure_environment() {
     local backup_dir="/var/lib/django/backups_locales"
     local backup_retention_days="7"
     local backup_remote="r2:django-backups"
+    local rclone_config="/root/.config/rclone/rclone.conf"
     local brevo_recipient=""
     local brevo_sender=""
     local brevo_sender_name="Adema Core Operaciones"
@@ -69,6 +70,7 @@ configure_environment() {
         backup_dir="${BACKUP_DIR:-$backup_dir}"
         backup_retention_days="${BACKUP_RETENTION_DAYS:-$backup_retention_days}"
         backup_remote="${BACKUP_REMOTE:-$backup_remote}"
+        rclone_config="${RCLONE_CONFIG:-$rclone_config}"
         brevo_recipient="${BREVO_RECIPIENT:-$brevo_recipient}"
         brevo_sender="${BREVO_SENDER:-$brevo_sender}"
         brevo_sender_name="${BREVO_SENDER_NAME:-$brevo_sender_name}"
@@ -89,6 +91,7 @@ configure_environment() {
     backup_dir=$(ask_value "BACKUP_DIR" "$backup_dir")
     backup_retention_days=$(ask_value "BACKUP_RETENTION_DAYS" "$backup_retention_days")
     backup_remote=$(ask_value "BACKUP_REMOTE" "$backup_remote")
+    rclone_config=$(ask_value "RCLONE_CONFIG" "$rclone_config")
     brevo_recipient=$(ask_value "BREVO_RECIPIENT" "$brevo_recipient")
     brevo_sender=$(ask_value "BREVO_SENDER" "$brevo_sender")
     brevo_sender_name=$(ask_value "BREVO_SENDER_NAME" "$brevo_sender_name")
@@ -111,6 +114,7 @@ VOLUME_FOLDERS="$volume_folders"
 BACKUP_DIR=$backup_dir
 BACKUP_RETENTION_DAYS=$backup_retention_days
 BACKUP_REMOTE=$backup_remote
+RCLONE_CONFIG=$rclone_config
 
 BREVO_RECIPIENT=$brevo_recipient
 BREVO_SENDER=$brevo_sender
