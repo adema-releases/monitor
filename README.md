@@ -150,6 +150,7 @@ En `monitor/.monitor.env`:
 - `VOLUME_FOLDERS`: carpetas por tenant (default `license logs media`).
 - `BACKUP_DIR`: directorio local de backups.
 - `BACKUP_REMOTE`: remote y path base de rclone (ejemplo `r2:miapp-backups`).
+- `RCLONE_CONFIG`: ruta del `rclone.conf` a usar para backups (ejemplo `/root/.config/rclone/rclone.conf`).
 - `BREVO_RECIPIENT`, `BREVO_SENDER`, `BREVO_SENDER_NAME`: datos email.
 - `DB_HOST`: host PostgreSQL para tests.
 - `DB_PORT`: puerto PostgreSQL para tests (default `5432`).
