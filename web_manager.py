@@ -520,67 +520,273 @@ def index() -> Response:
   <link rel="icon" type="image/x-icon" href="/static/logo/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body { background: radial-gradient(circle at 10% 10%, #d9f99d 0%, #f8fafc 45%, #cbd5e1 100%); }
-    .panel { backdrop-filter: blur(6px); }
+    :root {
+      --adema-navy: #020b1d;
+      --adema-ink: #07172f;
+      --adema-cyan: #10d5ef;
+      --adema-blue: #0667e8;
+      --adema-sky: #e7faff;
+      --adema-line: #d8e5ef;
+      --adema-muted: #63738a;
+      --adema-soft: #f7fbfd;
+      --adema-danger: #dc2626;
+      --adema-warning: #b96507;
+      --adema-success: #059669;
+      --adema-shadow: 0 18px 46px rgba(4, 19, 39, 0.10);
+    }
+
+    * { letter-spacing: 0 !important; }
+
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(16, 213, 239, 0.15) 0%, rgba(247, 251, 253, 0.96) 36%, #edf3f8 100%),
+        linear-gradient(90deg, rgba(6, 103, 232, 0.10), rgba(16, 213, 239, 0.08));
+      color: var(--adema-ink);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(90deg, rgba(6, 103, 232, 0.055) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(6, 103, 232, 0.045) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent 72%);
+    }
+
+    .shell { width: min(1180px, calc(100vw - 32px)); }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--adema-line);
+      border-radius: 8px !important;
+      box-shadow: var(--adema-shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand-header {
+      background:
+        linear-gradient(135deg, rgba(2, 11, 29, 0.98), rgba(5, 29, 61, 0.96));
+      border-color: rgba(16, 213, 239, 0.25);
+      color: #fff;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      border-radius: 8px;
+      filter: drop-shadow(0 8px 18px rgba(16, 213, 239, 0.22));
+    }
+
+    .brand-logo-login {
+      width: 92px;
+      height: 92px;
+      object-fit: contain;
+      margin: 0 auto;
+      border-radius: 8px;
+      filter: drop-shadow(0 14px 28px rgba(6, 103, 232, 0.22));
+    }
+
+    .brand-title { color: #fff; }
+    .brand-subtitle { color: #b9c8da; }
+    .section-title { color: var(--adema-ink); font-weight: 800; }
+    .muted { color: var(--adema-muted); }
+
+    .metric-card {
+      min-height: 96px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-left: 3px solid var(--adema-cyan);
+    }
+
+    .metric-label {
+      color: var(--adema-muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      color: var(--adema-ink);
+      font-size: 1.12rem;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      border-radius: 8px !important;
+      padding: 0.55rem 1rem;
+      font-weight: 800;
+      transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+    .btn.text-xs {
+      min-height: 32px;
+      padding: 0.35rem 0.7rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--adema-cyan), var(--adema-blue));
+      color: #00142b;
+      box-shadow: 0 12px 24px rgba(6, 103, 232, 0.20);
+    }
+
+    .btn-dark { background: var(--adema-navy); color: #fff; }
+    .btn-dark:hover { background: #09214a; }
+    .btn-success { background: var(--adema-success); color: #fff; }
+    .btn-success:hover { background: #047857; }
+    .btn-warning { background: #f59e0b; color: #291500; }
+    .btn-warning:hover { background: #d97706; }
+    .btn-danger { background: var(--adema-danger); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-soft { background: #eaf2f9; color: var(--adema-ink); border-color: var(--adema-line); }
+    .btn-soft:hover { background: #dceaf5; }
+
+    .input-control,
+    input,
+    textarea {
+      border-radius: 8px !important;
+      border: 1px solid var(--adema-line) !important;
+      background: #fff;
+      color: var(--adema-ink);
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--adema-cyan) !important;
+      box-shadow: 0 0 0 3px rgba(16, 213, 239, 0.18);
+    }
+
+    table { border-collapse: separate; border-spacing: 0; }
+    thead tr { color: var(--adema-muted); border-color: var(--adema-line); }
+    tbody tr { border-color: #e6eef5; }
+    tbody tr:hover { background: rgba(16, 213, 239, 0.055); }
+
+    .trash-panel {
+      background: #fffaf0;
+      border-color: #f4d69a;
+      box-shadow: 0 18px 42px rgba(185, 101, 7, 0.08);
+    }
+
+    .trash-panel .section-title { color: #7c3d06; }
+    .trash-note { color: #8a4a08; }
+
+    .pill {
+      border-radius: 8px;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 800;
+      background: #e7faff;
+      color: #075985;
+      border: 1px solid rgba(16, 213, 239, 0.30);
+    }
+
+    .terminal-panel {
+      background: #020b1d;
+      color: #ecfeff;
+      border-color: rgba(16, 213, 239, 0.22);
+    }
+
+    .terminal-output {
+      background: #010612;
+      border: 1px solid rgba(16, 213, 239, 0.18);
+      color: #b9f6ff;
+      border-radius: 8px !important;
+    }
+
+    .modal-backdrop { background: rgba(2, 11, 29, 0.72); backdrop-filter: blur(6px); }
+    .modal-card { border-radius: 8px !important; border: 1px solid var(--adema-line); }
+
+    .rounded-2xl,
+    .rounded-xl,
+    .rounded { border-radius: 8px !important; }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100vw - 24px, 1180px); }
+      .brand-header { align-items: flex-start; }
+      .brand-mark { width: 44px; height: 44px; }
+      .btn { width: 100%; white-space: normal; }
+      td .btn { width: auto; }
+      th, td { min-width: 120px; }
+    }
   </style>
 </head>
-<body class="min-h-screen text-slate-900">
-  <main class="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+<body>
+  <main class="shell mx-auto p-4 md:p-8 space-y-6">
 
     <!-- LOGIN: visible por defecto -->
-    <section id="loginSection" class="panel bg-white/80 border border-slate-200 rounded-2xl p-8 shadow-sm max-w-lg mx-auto mt-20">
-      <div class="mb-3">
-        <img src="/static/logo/logo.png" onerror="this.onerror=null;this.src='/static/img/logo_ademasistemas.png';" alt="Adema Core" class="h-12 md:h-14 w-auto mx-auto" />
+    <section id="loginSection" class="panel max-w-lg mx-auto mt-20 p-8 md:p-10 text-center">
+      <div class="mb-5">
+        <img src="/static/logo/logo.png" onerror="this.onerror=null;this.src='/static/img/logo_ademasistemas.png';" alt="Adema Core" class="brand-logo-login" />
       </div>
-      <p class="text-slate-500 text-sm mb-5">Ingresa tu token de acceso para continuar.</p>
+      <h1 class="text-2xl font-black text-slate-900">Adema Core</h1>
+      <p class="muted text-sm mt-2 mb-6">Ingresa tu token de acceso para continuar.</p>
       <div class="flex flex-col gap-3">
-        <input id="tokenInput" type="password" class="w-full border rounded-xl px-3 py-2" placeholder="ADEMA_WEB_TOKEN" />
-        <button id="saveTokenBtn" class="bg-lime-600 hover:bg-lime-700 text-white rounded-xl px-4 py-2 font-semibold">Ingresar</button>
+        <input id="tokenInput" type="password" class="input-control w-full px-3 py-2.5" placeholder="ADEMA_WEB_TOKEN" />
+        <button id="saveTokenBtn" class="btn btn-primary">Ingresar</button>
         <p id="loginError" class="text-red-600 text-sm hidden">Token invalido. Verifica e intenta de nuevo.</p>
       </div>
     </section>
 
     <!-- PANEL: oculto hasta autenticacion -->
     <div id="panelSection" class="hidden space-y-6">
-      <header class="panel bg-white/80 border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <img src="/static/logo/logo.png" onerror="this.onerror=null;this.src='/static/img/logo_ademasistemas.png';" alt="Adema Core" class="h-10 md:h-12 w-auto" />
+      <header class="panel brand-header p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <img src="/static/logo/Dise%C3%B1o%20sin%20t%C3%ADtulo%20(26).png" onerror="this.onerror=null;this.src='/static/logo/logo.png';" alt="Adema Core" class="brand-mark" />
           <div>
-            <h1 class="text-2xl md:text-3xl font-black tracking-tight">Adema Core - Control Center</h1>
-            <p class="text-slate-600 mt-1">Centro operativo Adema Core para gestionar nodo Django + PostgreSQL.</p>
+            <h1 class="brand-title text-2xl md:text-3xl font-black">Adema Core - Control Center</h1>
+            <p class="brand-subtitle mt-1 text-sm md:text-base">Centro operativo Adema Core para gestionar nodo Django + PostgreSQL.</p>
           </div>
         </div>
-        <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white rounded-xl px-4 py-2 font-semibold text-sm">Cerrar sesion</button>
+        <button id="logoutBtn" class="btn btn-danger text-sm">Cerrar sesion</button>
       </header>
 
       <section class="grid md:grid-cols-4 gap-4">
-        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-          <h2 class="text-xs uppercase tracking-wider text-slate-500">Host</h2>
-          <p id="hostName" class="text-lg font-bold">-</p>
+        <article class="panel metric-card p-4">
+          <h2 class="metric-label">Host</h2>
+          <p id="hostName" class="metric-value">-</p>
         </article>
-        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-          <h2 class="text-xs uppercase tracking-wider text-slate-500">RAM</h2>
-          <p id="ramUsage" class="text-lg font-bold">-</p>
+        <article class="panel metric-card p-4">
+          <h2 class="metric-label">RAM</h2>
+          <p id="ramUsage" class="metric-value">-</p>
         </article>
-        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-          <h2 class="text-xs uppercase tracking-wider text-slate-500">Disco /</h2>
-          <p id="diskUsage" class="text-lg font-bold">-</p>
+        <article class="panel metric-card p-4">
+          <h2 class="metric-label">Disco /</h2>
+          <p id="diskUsage" class="metric-value">-</p>
         </article>
-        <article class="panel bg-white/80 border rounded-2xl p-4 shadow-sm">
-          <h2 class="text-xs uppercase tracking-wider text-slate-500">Contenedores</h2>
-          <p id="containersCount" class="text-lg font-bold">-</p>
+        <article class="panel metric-card p-4">
+          <h2 class="metric-label">Contenedores</h2>
+          <p id="containersCount" class="metric-value">-</p>
         </article>
       </section>
 
-      <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-4">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-bold">Gestion de Tenants</h2>
-          <button id="backupBtn" class="bg-slate-900 hover:bg-slate-700 text-white rounded-xl px-4 py-2 font-semibold">Backup Now</button>
+      <section class="panel p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h2 class="section-title text-xl">Gestion de Tenants</h2>
+          <button id="backupBtn" class="btn btn-dark">Backup Now</button>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-slate-500 border-b">
+              <tr class="text-left border-b">
                 <th class="py-2">CLIENT_ID</th>
                 <th class="py-2">DB</th>
                 <th class="py-2">Acciones</th>
@@ -589,18 +795,18 @@ def index() -> Response:
             <tbody id="tenantsBody"></tbody>
           </table>
         </div>
-        <p class="text-xs text-slate-500">Mover a papelera oculta el tenant de esta tabla. El borrado definitivo se hace desde Papelera con confirmacion reforzada.</p>
+        <p class="muted text-xs">Mover a papelera oculta el tenant de esta tabla. El borrado definitivo se hace desde Papelera con confirmacion reforzada.</p>
       </section>
 
-      <section class="panel bg-amber-50/90 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-4">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-bold text-amber-900">Papelera de Tenants</h2>
-          <span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">doble seguridad</span>
+      <section class="panel trash-panel p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h2 class="section-title text-xl">Papelera de Tenants</h2>
+          <span class="pill">doble seguridad</span>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left text-amber-900/70 border-b border-amber-200">
+              <tr class="text-left border-b border-amber-200">
                 <th class="py-2">CLIENT_ID</th>
                 <th class="py-2">DB</th>
                 <th class="py-2">Movido</th>
@@ -610,66 +816,66 @@ def index() -> Response:
             <tbody id="trashBody"></tbody>
           </table>
         </div>
-        <p class="text-xs text-amber-800">Para borrar definitivo se debe escribir la frase exacta solicitada por el sistema.</p>
+        <p class="trash-note text-xs">Para borrar definitivo se debe escribir la frase exacta solicitada por el sistema.</p>
       </section>
 
-      <section class="panel bg-white/80 border rounded-2xl p-5 shadow-sm space-y-3">
-        <h2 class="text-xl font-bold">Formulario de Alta</h2>
+      <section class="panel p-5 space-y-3">
+        <h2 class="section-title text-xl">Formulario de Alta</h2>
         <div class="grid md:grid-cols-3 gap-3">
-          <input id="clientIdInput" class="border rounded-xl px-3 py-2" placeholder="cli001" />
-          <input id="clientPassInput" class="border rounded-xl px-3 py-2" placeholder="DB password opcional" />
-          <button id="createTenantBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Crear Infraestructura</button>
+          <input id="clientIdInput" class="input-control px-3 py-2.5" placeholder="cli001" />
+          <input id="clientPassInput" class="input-control px-3 py-2.5" placeholder="DB password opcional" />
+          <button id="createTenantBtn" class="btn btn-success">Crear Infraestructura</button>
         </div>
-        <p class="text-xs text-slate-500">Si no envias password, create_tenant.sh generara una automaticamente.</p>
+        <p class="muted text-xs">Si no envias password, create_tenant.sh generara una automaticamente.</p>
       </section>
 
-      <section class="panel bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl p-5 shadow-sm">
+      <section class="panel terminal-panel p-5">
         <div class="flex items-center justify-between gap-3 mb-2">
           <h2 class="text-xl font-bold">Logs en tiempo real</h2>
-          <span id="jobStatus" class="text-xs bg-slate-700 px-2 py-1 rounded">sin job activo</span>
+          <span id="jobStatus" class="pill">sin job activo</span>
         </div>
-        <pre id="logOutput" class="text-xs whitespace-pre-wrap h-72 overflow-auto bg-black/30 rounded-xl p-3"></pre>
+        <pre id="logOutput" class="terminal-output text-xs whitespace-pre-wrap h-72 overflow-auto p-3"></pre>
       </section>
     </div>
 
-    <div id="deleteTenantModal" class="hidden fixed inset-0 z-50 bg-black/50 p-4">
-      <div class="max-w-lg mx-auto mt-16 md:mt-24 bg-white rounded-2xl shadow-2xl border border-slate-200">
+    <div id="deleteTenantModal" class="modal-backdrop hidden fixed inset-0 z-50 p-4">
+      <div class="modal-card max-w-lg mx-auto mt-16 md:mt-24 bg-white shadow-2xl">
         <div class="p-5 border-b border-slate-200">
-          <h3 class="text-xl font-black text-slate-900">Confirmar Borrado Definitivo</h3>
-          <p class="text-sm text-slate-600 mt-1">Esta accion elimina base de datos, usuario SQL y volumenes del tenant.</p>
+          <h3 class="section-title text-xl">Confirmar Borrado Definitivo</h3>
+          <p class="muted text-sm mt-1">Esta accion elimina base de datos, usuario SQL y volumenes del tenant.</p>
         </div>
         <div class="p-5 space-y-4">
           <p class="text-sm text-slate-700">Tenant objetivo: <span id="deleteTenantTarget" class="font-bold">-</span></p>
 
           <label class="block text-sm font-semibold text-slate-700" for="confirmClientIdInput">Escribe el CLIENT_ID exacto</label>
-          <input id="confirmClientIdInput" class="w-full border rounded-xl px-3 py-2" placeholder="cli001" autocomplete="off" />
+          <input id="confirmClientIdInput" class="input-control w-full px-3 py-2.5" placeholder="cli001" autocomplete="off" />
 
           <label class="block text-sm font-semibold text-slate-700" for="confirmPhraseInput">Escribe la frase de confirmacion</label>
-          <p class="text-xs text-slate-600">Escriba la siguiente frase: <span id="deletePhraseHint" class="font-bold text-slate-900">BORRAR TENANT</span></p>
-          <input id="confirmPhraseInput" class="w-full border rounded-xl px-3 py-2" placeholder="BORRAR TENANT" autocomplete="off" />
+          <p class="muted text-xs">Escriba la siguiente frase: <span id="deletePhraseHint" class="font-bold text-slate-900">BORRAR TENANT</span></p>
+          <input id="confirmPhraseInput" class="input-control w-full px-3 py-2.5" placeholder="BORRAR TENANT" autocomplete="off" />
 
           <p id="deleteModalError" class="text-sm text-red-600 hidden"></p>
         </div>
         <div class="p-5 border-t border-slate-200 flex items-center justify-end gap-2">
-          <button id="cancelDeleteBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-4 py-2 font-semibold">Cancelar</button>
-          <button id="confirmDeleteBtn" class="bg-red-700 hover:bg-red-800 text-white rounded-xl px-4 py-2 font-semibold">Eliminar definitivo</button>
+          <button id="cancelDeleteBtn" class="btn btn-soft">Cancelar</button>
+          <button id="confirmDeleteBtn" class="btn btn-danger">Eliminar definitivo</button>
         </div>
       </div>
     </div>
 
-    <div id="connectionInfoModal" class="hidden fixed inset-0 z-50 bg-black/50 p-4">
-      <div class="max-w-xl mx-auto mt-16 md:mt-24 bg-white rounded-2xl shadow-2xl border border-slate-200">
+    <div id="connectionInfoModal" class="modal-backdrop hidden fixed inset-0 z-50 p-4">
+      <div class="modal-card max-w-xl mx-auto mt-16 md:mt-24 bg-white shadow-2xl">
         <div class="p-5 border-b border-slate-200">
-          <h3 class="text-xl font-black text-slate-900">Credenciales de Conexion</h3>
-          <p class="text-sm text-slate-600 mt-1">Guarda este dato ahora. No se mostrara nuevamente en el historial.</p>
+          <h3 class="section-title text-xl">Credenciales de Conexion</h3>
+          <p class="muted text-sm mt-1">Guarda este dato ahora. No se mostrara nuevamente en el historial.</p>
         </div>
         <div class="p-5 space-y-3">
           <p class="text-sm text-slate-700">Tenant: <span id="connectionClientId" class="font-bold">-</span></p>
-          <textarea id="connectionInfoText" readonly class="w-full h-52 border rounded-xl px-3 py-2 text-sm font-mono text-slate-800 bg-slate-50"></textarea>
+          <textarea id="connectionInfoText" readonly class="input-control w-full h-52 px-3 py-2 text-sm font-mono bg-slate-50"></textarea>
         </div>
         <div class="p-5 border-t border-slate-200 flex items-center justify-end gap-2">
-          <button id="downloadConnectionBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-2 font-semibold">Descargar .txt</button>
-          <button id="closeConnectionBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl px-4 py-2 font-semibold">Cerrar</button>
+          <button id="downloadConnectionBtn" class="btn btn-success">Descargar .txt</button>
+          <button id="closeConnectionBtn" class="btn btn-soft">Cerrar</button>
         </div>
       </div>
     </div>
@@ -872,10 +1078,10 @@ def index() -> Response:
       const rows = databases.map((db) => {
         const cid = escapeHtml(db.client_id || "");
         const dbName = escapeHtml(db.db_name || "");
-        return `<tr class="border-b border-slate-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2 flex flex-wrap gap-2"><button class="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-1 rounded test-db" data-client="${cid}">Test DB</button><button class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded move-trash" data-client="${cid}" data-db="${dbName}">Mover a papelera</button></td></tr>`;
+        return `<tr class="border-b"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2 flex flex-wrap gap-2"><button class="btn btn-dark text-xs min-h-0 py-1 test-db" data-client="${cid}">Test DB</button><button class="btn btn-warning text-xs min-h-0 py-1 move-trash" data-client="${cid}" data-db="${dbName}">Mover a papelera</button></td></tr>`;
       }).join("");
 
-      document.getElementById("tenantsBody").innerHTML = rows || '<tr><td colspan="3" class="py-3 text-slate-500">No hay tenants detectados.</td></tr>';
+      document.getElementById("tenantsBody").innerHTML = rows || '<tr><td colspan="3" class="py-3 muted">No hay tenants detectados.</td></tr>';
 
       document.querySelectorAll(".test-db").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -912,12 +1118,12 @@ def index() -> Response:
         const dbName = escapeHtml(item.db_name || "-");
         const moved = item.moved_at ? new Date(item.moved_at).toLocaleString("es-AR") : "-";
         const status = item.delete_job_id
-          ? `<span class="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded">eliminando...</span>`
+          ? `<span class="pill">eliminando...</span>`
           : "";
-        return `<tr class="border-b border-amber-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2">${escapeHtml(moved)}</td><td class="py-2 flex flex-wrap gap-2"><button class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded restore-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Restaurar</button><button class="bg-red-700 hover:bg-red-800 text-white px-3 py-1 rounded delete-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Borrar definitivo</button>${status}</td></tr>`;
+        return `<tr class="border-b border-amber-200"><td class="py-2 font-semibold">${cid}</td><td class="py-2">${dbName}</td><td class="py-2">${escapeHtml(moved)}</td><td class="py-2 flex flex-wrap gap-2"><button class="btn btn-success text-xs min-h-0 py-1 restore-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Restaurar</button><button class="btn btn-danger text-xs min-h-0 py-1 delete-tenant" data-client="${cid}" ${item.delete_job_id ? "disabled" : ""}>Borrar definitivo</button>${status}</td></tr>`;
       }).join("");
 
-      document.getElementById("trashBody").innerHTML = rows || '<tr><td colspan="4" class="py-3 text-amber-800/70">La papelera esta vacia.</td></tr>';
+      document.getElementById("trashBody").innerHTML = rows || '<tr><td colspan="4" class="py-3 trash-note">La papelera esta vacia.</td></tr>';
 
       document.querySelectorAll(".restore-tenant").forEach((btn) => {
         btn.addEventListener("click", async () => {
@@ -979,7 +1185,7 @@ def index() -> Response:
         document.getElementById("ramUsage").textContent = "-";
         document.getElementById("diskUsage").textContent = "-";
         document.getElementById("containersCount").textContent = "-";
-        document.getElementById("tenantsBody").innerHTML = '<tr><td colspan="3" class="py-3 text-slate-500">Sin datos de backend.</td></tr>';
+        document.getElementById("tenantsBody").innerHTML = '<tr><td colspan="3" class="py-3 muted">Sin datos de backend.</td></tr>';
       }
     }
 

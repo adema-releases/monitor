@@ -4,6 +4,22 @@ Todos los cambios relevantes de este proyecto se documentan aqui.
 
 ## Unreleased
 
+## 1.1.2 - 2026-05-06
+
+### Changed
+
+- Se actualiza la estetica del panel web operativo para alinearla con el manual de marca de Adema Sistemas.
+- Se incorporan estilos consistentes para header, login, metricas, tablas, formularios, modales, botones y consola de logs.
+- Se ajustan los botones y estados renderizados dinamicamente desde JavaScript para que usen el nuevo sistema visual.
+
+### Compatibility
+
+- No se modifican endpoints, tokens, scripts operativos ni contratos de API.
+
+### Docs
+
+- Nuevo changelist detallado en `CHANGESET-1.1.2.md`.
+
 ## 1.0.2 - 2026-03-28
 
 ### Security
