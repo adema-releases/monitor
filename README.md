@@ -1,8 +1,14 @@
 # Adema Core
 
-Repositorio oficial: https://github.com/adema-releases/adema-core
+Repositorio oficial: https://github.com/adema-releases/monitor
 
 Este repositorio contiene scripts Bash para operar y monitorear multiples proyectos Django desplegados en contenedores.
+
+Identidad publica recomendada:
+
+- Producto: Adema Core
+- Repo publico: `adema-releases/monitor`
+- Carpeta operativa sugerida en servidor: `/home/adema/monitor`
 
 ## Estado Open Source
 
@@ -20,8 +26,7 @@ Proyecto listo para uso publico con:
 Guia por tarea en la carpeta `docs/`:
 
 - `docs/index.html`: landing y runbook para GitHub Pages (documentacion publica del proyecto).
-
-- `docs/01-new-node.md`: provision y bootstrap de nodo nuevo.
+- `docs/01-new-node.md`: camino principal para levantar una VM Ubuntu 24.04 con Coolify y Adema Core.
 - `docs/02-create-tenant.md`: alta de tenant.
 - `docs/03-delete-tenant.md`: eliminacion segura de tenant.
 - `docs/04-backup-restore.md`: backup y restauracion.
@@ -37,23 +42,45 @@ Guia por tarea en la carpeta `docs/`:
 - Reemplaza IPs reales en docs por placeholders como `[TU_IP_AQUI]`.
 - Mantener `DB_NAME_PREFIX` y `DB_USER_PREFIX` evita acoplar naming real de infraestructura.
 
-## Quickstart (5 minutos)
+## Ruta recomendada: Ubuntu 24.04 + Coolify + Adema Core
+
+Para una VM Ubuntu 24.04 limpia, usa este flujo como camino feliz:
+
+1. Crear la VM y entrar por SSH.
+2. Actualizar sistema e instalar Docker, PostgreSQL, rclone, git, UFW y Fail2ban.
+3. Instalar Coolify y completar el onboarding con `This Machine`.
+4. Clonar este repo en `/home/adema/monitor`.
+5. Ejecutar el launcher, configurar variables demo/productivas y levantar el panel web.
+6. Validar snapshot, servicio web, backup y restore antes de considerar el nodo productivo.
+
+Runbook completo: `docs/01-new-node.md`.
 
 ```bash
-git clone https://github.com/adema-releases/adema-core
-cd monitor
-sudo chmod +x run_monitor.sh setup_cron.sh setup_web_panel.sh monitor/*.sh
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://get.docker.com | sh
+sudo apt install -y postgresql postgresql-contrib rclone openssl git ufw fail2ban
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+
+sudo useradd -m -s /bin/bash adema || true
+sudo usermod -aG sudo adema
+sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor
+cd /home/adema/monitor
+sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
 sudo bash run_monitor.sh
 sudo bash setup_web_panel.sh
 ```
 
-Alternativa recomendada para cubrir todos los scripts del repo:
+## Quickstart del monitor
 
 ```bash
+git clone https://github.com/adema-releases/monitor
+cd monitor
 sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
+sudo bash run_monitor.sh
+sudo bash setup_web_panel.sh
 ```
 
-El comando `chmod +x` asegura permisos de ejecucion en todos los scripts. Si se clona el repo con permisos alterados, evita errores como `Permission denied`.
+El comando `find ... chmod 755` asegura permisos de ejecucion en todos los scripts. Si se clona el repo con permisos alterados, evita errores como `Permission denied`.
 
 Despues valida:
 
@@ -140,16 +167,16 @@ chmod 600 monitor/.monitor.secrets
 En `monitor/.monitor.env`:
 
 - Usa comillas dobles cuando el valor tenga espacios o caracteres especiales de shell (por ejemplo `|`).
-- Ejemplos: `BREVO_SENDER_NAME="Adema Core Operaciones"` y `EXCLUDE_CONTAINER_REGEX="coolify|NAME"`.
+- Ejemplos: `BREVO_SENDER_NAME="Adema Core Demo"` y `EXCLUDE_CONTAINER_REGEX="coolify|NAME"`.
 
-- `PROJECT_CODE`: codigo del proyecto (ejemplo `miapp`).
+- `PROJECT_CODE`: codigo del proyecto (ejemplo `demo`).
 - `CLUSTER_ID`: identificador del cluster/nodo.
-- `DB_NAME_PREFIX`: prefijo de DB (ejemplo `miapp_db`).
-- `DB_USER_PREFIX`: prefijo de usuario SQL (ejemplo `user_miapp`).
+- `DB_NAME_PREFIX`: prefijo de DB (ejemplo `demo_db`).
+- `DB_USER_PREFIX`: prefijo de usuario SQL (ejemplo `demo_user`).
 - `VOLUME_PREFIX`: prefijo de volumenes Docker.
 - `VOLUME_FOLDERS`: carpetas por tenant (default `license logs media`).
 - `BACKUP_DIR`: directorio local de backups.
-- `BACKUP_REMOTE`: remote y path base de rclone (ejemplo `r2:miapp-backups`).
+- `BACKUP_REMOTE`: remote y path base de rclone (ejemplo `r2:demo-backups`).
 - `RCLONE_CONFIG`: ruta del `rclone.conf` a usar para backups (ejemplo `/root/.config/rclone/rclone.conf`).
 - `BREVO_RECIPIENT`, `BREVO_SENDER`, `BREVO_SENDER_NAME`: datos email.
 - `DB_HOST`: host PostgreSQL para tests.
@@ -319,8 +346,10 @@ sudo bash setup_web_panel.sh
 
 ```bash
 sudo ufw status
-sudo ufw allow 5000/tcp
+sudo ufw allow from [TU_IP_AUTORIZADA] to any port 5000 proto tcp
 ```
+
+No expongas el puerto `5000` abierto a internet sin VPN, tunnel seguro o allowlist de IPs.
 
 ## Cron de produccion
 
@@ -451,6 +480,8 @@ sudo bash monitor/restore_tenant.sh cli001 2026-03-27 archivo.sql.gz
 ```bash
 bash monitor/test_tenant_db.sh cli001
 ```
+
+El restore probado es obligatorio antes de considerar un nodo como productivo.
 
 ### 6) Validar borrado (solo entorno de prueba)
 

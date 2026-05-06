@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # Adema Core - Health snapshot
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null

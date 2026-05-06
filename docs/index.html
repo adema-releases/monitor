@@ -4,17 +4,176 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adema Core | Open Source Infrastructure</title>
+    <link rel="icon" href="../static/logo/favicon.ico" sizes="any">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --adema-bg: #020713;
+            --adema-bg-soft: #07111f;
+            --adema-panel: rgba(8, 20, 35, 0.84);
+            --adema-panel-strong: rgba(10, 28, 48, 0.94);
+            --adema-line: rgba(12, 213, 232, 0.28);
+            --adema-line-strong: rgba(12, 213, 232, 0.58);
+            --adema-cyan: #12d6e8;
+            --adema-blue: #0864df;
+            --adema-white: #f8fbff;
+            --adema-muted: #b8c7d8;
+            --adema-soft: #7f93a8;
+        }
+
+        body {
+            background:
+                linear-gradient(135deg, rgba(8, 100, 223, 0.12) 0%, transparent 28%),
+                linear-gradient(180deg, #020713 0%, #050b18 48%, #020713 100%);
+            color: var(--adema-white);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(90deg, rgba(18, 214, 232, 0.08) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(18, 214, 232, 0.05) 1px, transparent 1px),
+                linear-gradient(135deg, transparent 0 45%, rgba(18, 214, 232, 0.12) 45% 46%, transparent 46% 100%);
+            background-size: 96px 96px, 96px 96px, 320px 320px;
+            opacity: 0.34;
+        }
+
+        .brand-header {
+            background: rgba(2, 7, 19, 0.86) !important;
+            border-color: var(--adema-line) !important;
+        }
+
+        .brand-hero {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--adema-line);
+            background:
+                linear-gradient(135deg, rgba(18, 214, 232, 0.10), transparent 36%),
+                linear-gradient(180deg, rgba(8, 20, 35, 0.88), rgba(2, 7, 19, 0.92));
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+        }
+
+        .brand-hero::after {
+            content: "";
+            position: absolute;
+            right: -2rem;
+            bottom: -2rem;
+            width: min(34rem, 58vw);
+            height: min(20rem, 42vw);
+            background:
+                linear-gradient(135deg, transparent 0 38%, rgba(18, 214, 232, 0.22) 38% 39%, transparent 39% 100%),
+                linear-gradient(155deg, transparent 0 56%, rgba(8, 100, 223, 0.18) 56% 57%, transparent 57% 100%);
+            opacity: 0.7;
+        }
+
+        .brand-logo-mark {
+            filter: drop-shadow(0 0 18px rgba(18, 214, 232, 0.36));
+        }
+
+        .brand-kicker {
+            color: var(--adema-cyan);
+            letter-spacing: 0.16em;
+        }
+
+        .bg-white,
+        .bg-slate-50,
+        .bg-slate-100,
+        .bg-indigo-800,
+        .bg-indigo-900,
+        .bg-emerald-50,
+        .bg-amber-50,
+        .bg-cyan-50 {
+            background-color: var(--adema-panel) !important;
+        }
+
+        .bg-slate-900 {
+            background-color: #030916 !important;
+            border: 1px solid rgba(18, 214, 232, 0.18);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+        }
+
+        .border-slate-200,
+        .border-indigo-700,
+        .border-emerald-200,
+        .border-amber-200,
+        .border-cyan-200 {
+            border-color: var(--adema-line) !important;
+        }
+
+        .text-slate-900,
+        .text-emerald-800,
+        .text-amber-800,
+        .text-cyan-800,
+        .text-amber-900 {
+            color: var(--adema-white) !important;
+        }
+
+        .text-slate-700,
+        .text-slate-600,
+        .text-indigo-100,
+        .text-emerald-700,
+        .text-amber-700,
+        .text-cyan-700 {
+            color: var(--adema-muted) !important;
+        }
+
+        .text-slate-500,
+        .text-indigo-300 {
+            color: var(--adema-soft) !important;
+        }
+
+        .text-indigo-600,
+        .text-indigo-700,
+        .text-indigo-900,
+        .text-indigo-400,
+        a {
+            color: var(--adema-cyan) !important;
+        }
+
+        .bg-indigo-100,
+        .bg-indigo-600,
+        .bg-indigo-500\/20 {
+            background-color: rgba(18, 214, 232, 0.12) !important;
+            border-color: var(--adema-line-strong) !important;
+        }
+
+        .copy-block {
+            color: #7eefff !important;
+        }
+
+        .copy-block button {
+            border-color: rgba(18, 214, 232, 0.45) !important;
+            background-color: rgba(18, 214, 232, 0.12) !important;
+            color: var(--adema-white) !important;
+        }
+
+        .rounded-2xl,
+        .rounded-3xl,
+        .rounded-xl {
+            border-radius: 0.5rem !important;
+        }
+
+        .brand-button {
+            background: linear-gradient(135deg, var(--adema-cyan), var(--adema-blue)) !important;
+            color: #020713 !important;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            font-weight: 800;
+            border-radius: 0.5rem !important;
+        }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans antialiased">
 
-    <header class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
+    <header class="brand-header sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
             <div class="flex items-center gap-2">
-                <div class="bg-indigo-600 text-white p-2 rounded-lg">
-                    <i class="fas fa-cubes"></i>
-                </div>
+                <img src="../static/logo/Dise%C3%B1o%20sin%20t%C3%ADtulo%20(26).png" alt="Adema Sistemas" class="brand-logo-mark h-9 w-9 object-contain">
                 <span class="text-xl font-bold tracking-tight text-slate-900">Adema<span class="text-indigo-600">Core</span></span>
             </div>
             <nav class="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
@@ -23,28 +182,34 @@
                 <a href="#operaciones" class="hover:text-indigo-600">Operaciones</a>
                 <a href="#docs" class="hover:text-indigo-600">Docs</a>
             </nav>
-            <a href="https://github.com/adema-releases/adema-core" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hover:bg-slate-800 transition">
+            <a href="https://github.com/adema-releases/monitor" class="brand-button px-4 py-2 rounded-full text-sm transition">
                 <i class="fab fa-github mr-2"></i>Ver en GitHub
             </a>
         </div>
     </header>
 
     <main class="max-w-5xl mx-auto px-4 py-12">
-        <section class="text-center mb-20">
-            <h1 class="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">Runbook de Nodo <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Adema Core</span></h1>
-            <p class="text-lg text-slate-600 max-w-3xl mx-auto">Adema Core es la capa operativa para estandarizar despliegue, monitoreo y continuidad de apps Django en nodos productivos con Coolify y PostgreSQL.</p>
-            <p class="text-base text-slate-500 max-w-3xl mx-auto mt-3">La vision es operar con criterio de plataforma: procesos repetibles, seguridad por defecto, observabilidad util y recuperacion ante incidentes con backups verificables.</p>
+        <section class="brand-hero mb-20 px-6 py-10 md:px-10 md:py-14">
+            <div class="relative z-10 max-w-3xl">
+                <img src="../static/logo/logo.png" alt="Adema Sistemas" class="brand-logo-mark mb-8 h-28 w-28 rounded-xl object-contain md:h-36 md:w-36">
+                <p class="brand-kicker text-sm font-bold uppercase mb-4">Infraestructura operativa para crecimiento sostenible</p>
+                <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6 tracking-tight">Ubuntu 24.04 + Coolify + <span class="text-indigo-600">Adema Core</span></h1>
+                <p class="text-lg text-slate-600 max-w-3xl">Adema Core es la capa operativa para estandarizar despliegue, monitoreo y continuidad de apps Django en una VM Ubuntu 24.04 con Coolify y PostgreSQL.</p>
+                <p class="text-base text-slate-500 max-w-3xl mt-3">Procesos repetibles, seguridad por defecto, observabilidad util y recuperacion ante incidentes con backups verificables.</p>
+            </div>
         </section>
 
         <section id="quickstart" class="mb-20 bg-white border border-slate-200 rounded-2xl p-6 md:p-8">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
                 <h2 class="text-2xl font-bold">Quick Start: push -> nodo nuevo</h2>
-                <a href="https://github.com/adema-releases/adema-core" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
+                <a href="https://github.com/adema-releases/monitor" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Abrir repo oficial</a>
             </div>
-            <p class="text-slate-600 mb-4">Si acabas de hacer push y quieres un bootstrap limpio, estos 3 pasos son el camino corto recomendado.</p>
+            <p class="text-slate-600 mb-4">Si tienes una VM Ubuntu 24.04 y Coolify listo, estos comandos dejan el monitor y el panel web operativos.</p>
             <div class="copy-block relative bg-slate-900 text-indigo-300 p-4 pr-14 rounded-xl font-mono text-sm leading-7">
-                git clone https://github.com/adema-releases/adema-core<br>
-                cd monitor && sudo bash run_monitor.sh<br>
+                git clone https://github.com/adema-releases/monitor<br>
+                cd monitor<br>
+                sudo find . -type f -name "*.sh" -exec chmod 755 {} \;<br>
+                sudo bash run_monitor.sh<br>
                 sudo bash setup_web_panel.sh
             </div>
             <div class="mt-3">
@@ -63,27 +228,27 @@
             </div>
             <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
                 <p class="font-semibold">Importante (primera ejecucion)</p>
-                <p class="mt-1">No es error si aparece el asistente interactivo con prompts como <span class="font-mono">PROJECT_CODE [django]:</span> o <span class="font-mono">CLUSTER_ID [CLUSTER-DJANGO-01]:</span>. Completa los datos (o presiona Enter para dejar defaults), guarda y luego continua con <span class="font-mono">setup_web_panel.sh</span>.</p>
+                <p class="mt-1">No es error si aparece el asistente interactivo con prompts como <span class="font-mono">PROJECT_CODE [demo]:</span> o <span class="font-mono">CLUSTER_ID [CLUSTER-DEMO-01]:</span>. Completa los datos (o presiona Enter para dejar defaults), guarda y luego continua con <span class="font-mono">setup_web_panel.sh</span>.</p>
             </div>
             <div class="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700">
-                <p class="font-semibold text-slate-900">Valores base sugeridos para PROD</p>
+                <p class="font-semibold text-slate-900">Valores base sugeridos para demo</p>
                 <ul class="mt-2 space-y-1">
-                    <li><span class="font-mono">PROJECT_CODE</span>: django</li>
-                    <li><span class="font-mono">CLUSTER_ID</span>: NODO_001 (o tu patron NODO_XXX)</li>
-                    <li><span class="font-mono">DB_NAME_PREFIX</span>: django_db</li>
-                    <li><span class="font-mono">DB_USER_PREFIX</span>: user_django</li>
-                    <li><span class="font-mono">BACKUP_REMOTE</span>: tu remote rclone real (ej: r2:django-backups)</li>
+                    <li><span class="font-mono">PROJECT_CODE</span>: demo</li>
+                    <li><span class="font-mono">CLUSTER_ID</span>: CLUSTER-DEMO-01</li>
+                    <li><span class="font-mono">DB_NAME_PREFIX</span>: demo_db</li>
+                    <li><span class="font-mono">DB_USER_PREFIX</span>: demo_user</li>
+                    <li><span class="font-mono">BACKUP_REMOTE</span>: tu remote rclone real (ej: r2:demo-backups)</li>
                     <li><span class="font-mono">BREVO_RECIPIENT / BREVO_SENDER</span>: correos reales de alertas</li>
                 </ul>
             </div>
             <div class="mt-5 grid md:grid-cols-3 gap-3 text-sm">
                 <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
                     <p class="font-semibold text-emerald-800">Salida esperada</p>
-                    <p class="text-emerald-700 mt-1">URL del panel + token ADEMA_WEB_TOKEN</p>
+                    <p class="text-emerald-700 mt-1">URL del panel + token para login</p>
                 </div>
                 <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
                     <p class="font-semibold text-amber-800">Precondicion</p>
-                    <p class="text-amber-700 mt-1">Servidor Ubuntu con Docker, PostgreSQL y rclone</p>
+                    <p class="text-amber-700 mt-1">VM Ubuntu 24.04 con Docker, PostgreSQL y rclone</p>
                 </div>
                 <div class="bg-cyan-50 border border-cyan-200 rounded-xl p-3">
                     <p class="font-semibold text-cyan-800">Validacion minima</p>
@@ -234,10 +399,11 @@
                         sudo usermod -aG sudo adema<br>
                         <br>
                         # 2. Clonar el Framework en la ruta correcta (fuera de root)<br>
-                        sudo -u adema git clone https://github.com/adema-releases/adema-core /home/adema/monitor<br>
+                        sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor<br>
                         cd /home/adema/monitor<br>
                         <br>
-                        # 3. Lanzar configuracion y panel web<br>
+                        # 3. Asegurar permisos y lanzar configuracion/panel web<br>
+                        sudo find . -type f -name "*.sh" -exec chmod 755 {} \;<br>
                         sudo bash run_monitor.sh<br>
                         sudo bash setup_web_panel.sh
                     </div>
@@ -250,15 +416,15 @@
                                 <ul class="mt-1 list-disc list-inside space-y-1">
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man8/useradd.8.html" target="_blank" rel="noopener noreferrer">useradd/usermod</a>: crea el usuario de operaciones y lo agrega a sudo.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://git-scm.com/docs/git-clone" target="_blank" rel="noopener noreferrer">git clone (sudo -u adema)</a>: descarga el repo con propietario correcto en <span class="font-mono">/home/adema/monitor</span>.</li>
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/run_monitor.sh" target="_blank" rel="noopener noreferrer">run_monitor.sh</a>: asistente CLI de configuracion y tareas diarias.</li>
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/setup_web_panel.sh" target="_blank" rel="noopener noreferrer">setup_web_panel.sh</a>: crea servicio systemd, entorno Python y token del panel.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/run_monitor.sh" target="_blank" rel="noopener noreferrer">run_monitor.sh</a>: asistente CLI de configuracion y tareas diarias.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/setup_web_panel.sh" target="_blank" rel="noopener noreferrer">setup_web_panel.sh</a>: crea servicio systemd, entorno Python y token del panel.</li>
                                 </ul>
                             </div>
                         </div>
                     </div>
                     <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700">
-                        <h4 class="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">Primera ejecucion de run_monitor.sh (referencia prod)</h4>
-                        <p>Si estas configurando el nodo NODO-001-GDC por primera vez, puedes usar estos valores cuando el asistente te pregunte variable por variable.</p>
+                        <h4 class="text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">Primera ejecucion de run_monitor.sh (modo demo)</h4>
+                        <p>Para una instalacion publica o demo, puedes usar estos valores cuando el asistente te pregunte variable por variable.</p>
                         <div class="mt-4 overflow-x-auto">
                             <table class="w-full text-xs">
                                 <thead>
@@ -269,20 +435,20 @@
                                     </tr>
                                 </thead>
                                 <tbody class="text-slate-700 align-top">
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">PROJECT_CODE</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Estandariza naming de proyecto en todo el nodo.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">CLUSTER_ID</td><td class="py-2 pr-4 font-mono text-indigo-700">CLUSTER-GDC-01</td><td class="py-2">Identificador unico del nodo para inventario y alertas.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Uniforma nombre logico de bases y recursos.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_NAME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">ad_db</td><td class="py-2">Prefijo interno de DB para separar entornos.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_USER_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adm_</td><td class="py-2">Prefijo de usuarios SQL consistente y auditable.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">PROJECT_CODE</td><td class="py-2 pr-4 font-mono text-indigo-700">demo</td><td class="py-2">Estandariza naming de proyecto en todo el nodo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">CLUSTER_ID</td><td class="py-2 pr-4 font-mono text-indigo-700">CLUSTER-DEMO-01</td><td class="py-2">Identificador unico del nodo para inventario y alertas.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">demo</td><td class="py-2">Uniforma nombre logico de bases y recursos.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_NAME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">demo_db</td><td class="py-2">Prefijo interno de DB para separar entornos.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_USER_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">demo_user</td><td class="py-2">Prefijo de usuarios SQL consistente y auditable.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_BASE_PATH</td><td class="py-2 pr-4">Presionar Enter</td><td class="py-2">Mantiene path estandar de Docker.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">adema</td><td class="py-2">Ordena volumenes por marca/proyecto.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_PREFIX</td><td class="py-2 pr-4 font-mono text-indigo-700">demo</td><td class="py-2">Ordena volumenes por proyecto.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">VOLUME_FOLDERS</td><td class="py-2 pr-4">Presionar Enter</td><td class="py-2">Conserva defaults recomendados: license logs media.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_DIR</td><td class="py-2 pr-4 font-mono text-indigo-700">/var/lib/adema/backups_locales</td><td class="py-2">Ubicacion segura para dumps locales.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_RETENTION_DAYS</td><td class="py-2 pr-4 font-mono text-indigo-700">30</td><td class="py-2">Retencion corporativa mas robusta que 7 dias.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_REMOTE</td><td class="py-2 pr-4 font-mono text-indigo-700">do:cluster-gdc-01</td><td class="py-2">Remote de DigitalOcean Spaces para continuidad.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_RECIPIENT</td><td class="py-2 pr-4 font-mono text-indigo-700">ademasistemas@gmail.com</td><td class="py-2">Buzon central de monitoreo.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER</td><td class="py-2 pr-4 font-mono text-indigo-700">notificaciones@gestiondecreditos.app</td><td class="py-2">Sender profesional para alertas.</td></tr>
-                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER_NAME</td><td class="py-2 pr-4 font-mono text-indigo-700">Notificaciones GDC - No responder</td><td class="py-2">Identificacion clara del origen de correo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_DIR</td><td class="py-2 pr-4 font-mono text-indigo-700">/var/lib/demo/backups_locales</td><td class="py-2">Ubicacion segura para dumps locales.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_RETENTION_DAYS</td><td class="py-2 pr-4 font-mono text-indigo-700">30</td><td class="py-2">Retencion operativa de ejemplo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BACKUP_REMOTE</td><td class="py-2 pr-4 font-mono text-indigo-700">r2:demo-backups</td><td class="py-2">Remote rclone de ejemplo para continuidad.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_RECIPIENT</td><td class="py-2 pr-4 font-mono text-indigo-700">ops@example.com</td><td class="py-2">Buzon de alertas de ejemplo.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER</td><td class="py-2 pr-4 font-mono text-indigo-700">no-reply@example.com</td><td class="py-2">Sender de ejemplo para alertas.</td></tr>
+                                    <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">BREVO_SENDER_NAME</td><td class="py-2 pr-4 font-mono text-indigo-700">Adema Core Demo</td><td class="py-2">Identificacion clara del origen de correo.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">DB_HOST</td><td class="py-2 pr-4 font-mono text-indigo-700">(vacio para auto)</td><td class="py-2">Auto-deteccion de IP docker0 para alcanzar host PostgreSQL.</td></tr>
                                     <tr class="border-b border-slate-100"><td class="py-2 pr-4 font-mono">RAM_THRESHOLD_MB</td><td class="py-2 pr-4 font-mono text-indigo-700">450</td><td class="py-2">Alerta temprana para evitar degradacion por memoria.</td></tr>
                                     <tr><td class="py-2 pr-4 font-mono">EXCLUDE_CONTAINER_REGEX</td><td class="py-2 pr-4 font-mono text-indigo-700">coolify|NAME</td><td class="py-2">Evita ruido monitoreando contenedores de sistema.</td></tr>
@@ -290,8 +456,8 @@
                             </table>
                         </div>
                         <div class="mt-4 grid md:grid-cols-2 gap-4 text-xs font-mono">
-                            <div class="text-slate-500">BACKUP_REMOTE:</div><div class="text-indigo-700 font-bold">do:cluster-gdc-01</div>
-                            <div class="text-slate-500">DB_PREFIX:</div><div class="text-indigo-700 font-bold">adema</div>
+                            <div class="text-slate-500">BACKUP_REMOTE:</div><div class="text-indigo-700 font-bold">r2:demo-backups</div>
+                            <div class="text-slate-500">DB_PREFIX:</div><div class="text-indigo-700 font-bold">demo</div>
                             <div class="text-slate-500">DB_HOST:</div><div class="text-indigo-700 font-bold">(auto docker0)</div>
                             <div class="text-slate-500">RETENTION:</div><div class="text-indigo-700 font-bold">30 days</div>
                         </div>
@@ -318,7 +484,7 @@
                                 <p><strong>Que hace:</strong> valida salud del nodo, confirma que el servicio web esta activo en systemd y programa tareas recurrentes en cron.</p>
                                 <p class="mt-2"><strong>Herramientas:</strong></p>
                                 <ul class="mt-1 list-disc list-inside space-y-1">
-                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/adema-core/blob/main/monitor/status_snapshot.sh" target="_blank" rel="noopener noreferrer">status_snapshot.sh</a>: resumen tecnico del estado operativo.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/monitor/status_snapshot.sh" target="_blank" rel="noopener noreferrer">status_snapshot.sh</a>: resumen tecnico del estado operativo.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://www.freedesktop.org/software/systemd/man/systemctl.html" target="_blank" rel="noopener noreferrer">systemctl status</a>: inspeccion de estado del servicio.</li>
                                     <li><a class="text-indigo-700 hover:text-indigo-900" href="https://man7.org/linux/man-pages/man5/crontab.5.html" target="_blank" rel="noopener noreferrer">cron</a>: automatizacion de backups/monitor/sentinel por horario.</li>
                                 </ul>
@@ -485,14 +651,14 @@
             <h2 class="text-2xl font-bold mb-4">Documentacion Por Tarea</h2>
             <p class="text-slate-600 mb-6">Este index funciona como portal de documentacion. Los links apuntan al repo oficial para que no dependan de rutas locales.</p>
             <ul class="grid md:grid-cols-2 gap-3 text-sm">
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/01-new-node.md" target="_blank" rel="noopener noreferrer">01-new-node.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/02-create-tenant.md" target="_blank" rel="noopener noreferrer">02-create-tenant.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/03-delete-tenant.md" target="_blank" rel="noopener noreferrer">03-delete-tenant.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/04-backup-restore.md" target="_blank" rel="noopener noreferrer">04-backup-restore.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/05-health-and-alerts.md" target="_blank" rel="noopener noreferrer">05-health-and-alerts.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
-                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/adema-core/blob/main/docs/08-master-node-federation.md" target="_blank" rel="noopener noreferrer">08-master-node-federation.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/01-new-node.md" target="_blank" rel="noopener noreferrer">01-new-node.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/02-create-tenant.md" target="_blank" rel="noopener noreferrer">02-create-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/03-delete-tenant.md" target="_blank" rel="noopener noreferrer">03-delete-tenant.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/04-backup-restore.md" target="_blank" rel="noopener noreferrer">04-backup-restore.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/05-health-and-alerts.md" target="_blank" rel="noopener noreferrer">05-health-and-alerts.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/08-master-node-federation.md" target="_blank" rel="noopener noreferrer">08-master-node-federation.md</a></li>
             </ul>
         </section>
     </main>

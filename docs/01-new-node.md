@@ -1,6 +1,15 @@
-# Provision y Bootstrap Del Nodo
+# Provision y Bootstrap Del Nodo Ubuntu 24.04 + Coolify
 
-Este documento esta pensado para levantar un nodo Django de forma repetible, segura y facil de operar a futuro.
+Este documento esta pensado para que cualquier persona con una VM Ubuntu 24.04 limpia pueda levantar Coolify, clonar Adema Core desde el repo publico `adema-releases/monitor`, configurar el monitor y dejar el panel web operativo de forma repetible.
+
+Resultado esperado al terminar:
+
+- Coolify instalado y con onboarding inicial completado.
+- Repo clonado en `/home/adema/monitor`.
+- Variables demo/productivas generadas en `monitor/.monitor.env`.
+- Secretos guardados fuera del repo.
+- Panel web activo como `adema-web-panel.service`.
+- Backup, monitoreo y restore validados antes de produccion.
 
 ## 1. Crear nodo con patron de nombre
 
@@ -74,8 +83,8 @@ Para tu flujo actual:
 sudo useradd -m -s /bin/bash adema
 sudo usermod -aG sudo adema
 
-# 2. Clonar el Framework en la ruta correcta (fuera de root)
-sudo -u adema git clone https://github.com/adema-releases/adema-core /home/adema/monitor
+# 2. Clonar el repo publico en la ruta correcta (fuera de root)
+sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor
 cd /home/adema/monitor
 
 # 3. Asegurar permisos de ejecucion de scripts
@@ -90,11 +99,11 @@ Este comando previene errores `Permission denied` cuando se ejecutan opciones de
 
 En primera ejecucion, `run_monitor.sh` abrira asistente interactivo. Es normal ver prompts como:
 
-- `PROJECT_CODE [django]:`
-- `CLUSTER_ID [CLUSTER-DJANGO-01]:`
-- `DB_NAME_PREFIX [django_db]:`
-- `DB_USER_PREFIX [user_django]:`
-- `BACKUP_REMOTE [r2:django-backups]:`
+- `PROJECT_CODE [demo]:`
+- `CLUSTER_ID [CLUSTER-DEMO-01]:`
+- `DB_NAME_PREFIX [demo_db]:`
+- `DB_USER_PREFIX [demo_user]:`
+- `BACKUP_REMOTE [r2:demo-backups]:`
 
 Si quieres aceptar el valor sugerido, presiona Enter. Si necesitas personalizar, escribe el valor y Enter.
 
@@ -112,34 +121,34 @@ En este paso guarda tambien:
 - `ADEMA_WEB_TOKEN`
 - `BREVO_API_KEY`
 
-### Primera ejecucion de run_monitor.sh (referencia prod)
+### Primera ejecucion de run_monitor.sh (modo demo publico)
 
-Si estas configurando el nodo NODO-001-GDC por primera vez, puedes usar estos valores en el asistente:
+Para documentacion publica, usa valores neutros como estos. En produccion reemplazalos por los datos reales de tu organizacion y guardalos fuera del repo.
 
 | Prompt | Valor sugerido | Razon tecnica |
 |---|---|---|
-| PROJECT_CODE | adema | Estandariza naming de proyecto en todo el nodo. |
-| CLUSTER_ID | CLUSTER-GDC-01 | Identificador unico del nodo para inventario y alertas. |
-| DB_PREFIX | adema | Uniforma nombre logico de bases y recursos. |
-| DB_NAME_PREFIX | ad_db | Prefijo interno de DB para separar entornos. |
-| DB_USER_PREFIX | adm_ | Prefijo de usuarios SQL consistente y auditable. |
+| PROJECT_CODE | demo | Estandariza naming de proyecto en todo el nodo. |
+| CLUSTER_ID | CLUSTER-DEMO-01 | Identificador unico del nodo para inventario y alertas. |
+| DB_PREFIX | demo | Uniforma nombre logico de bases y recursos. |
+| DB_NAME_PREFIX | demo_db | Prefijo interno de DB para separar entornos. |
+| DB_USER_PREFIX | demo_user | Prefijo de usuarios SQL consistente y auditable. |
 | VOLUME_BASE_PATH | Presionar Enter | Mantiene path estandar de Docker. |
-| VOLUME_PREFIX | adema | Ordena volumenes por marca/proyecto. |
+| VOLUME_PREFIX | demo | Ordena volumenes por proyecto. |
 | VOLUME_FOLDERS | Presionar Enter | Conserva defaults recomendados: license logs media. |
-| BACKUP_DIR | /var/lib/adema/backups_locales | Ubicacion segura para dumps locales. |
-| BACKUP_RETENTION_DAYS | 30 | Retencion corporativa mas robusta que 7 dias. |
-| BACKUP_REMOTE | do:cluster-gdc-01 | Remote de DigitalOcean Spaces para continuidad. |
-| BREVO_RECIPIENT | ademasistemas@gmail.com | Buzon central de monitoreo. |
-| BREVO_SENDER | notificaciones@gestiondecreditos.app | Sender profesional para alertas. |
-| BREVO_SENDER_NAME | Notificaciones GDC - No responder | Identificacion clara del origen de correo. |
+| BACKUP_DIR | /var/lib/demo/backups_locales | Ubicacion segura para dumps locales. |
+| BACKUP_RETENTION_DAYS | 30 | Retencion operativa de ejemplo. |
+| BACKUP_REMOTE | r2:demo-backups | Remote rclone de ejemplo para continuidad. |
+| BREVO_RECIPIENT | ops@example.com | Buzon de alertas de ejemplo. |
+| BREVO_SENDER | no-reply@example.com | Sender de ejemplo para alertas. |
+| BREVO_SENDER_NAME | Adema Core Demo | Identificacion clara del origen de correo. |
 | DB_HOST | (vacio para auto) | Auto-deteccion de IP docker0 para alcanzar host PostgreSQL. |
 | RAM_THRESHOLD_MB | 450 | Alerta temprana para evitar degradacion por memoria. |
 | EXCLUDE_CONTAINER_REGEX | coolify\|NAME | Evita ruido monitoreando contenedores de sistema. |
 
 Diccionario rapido:
 
-- BACKUP_REMOTE: do:cluster-gdc-01
-- DB_PREFIX: adema
+- BACKUP_REMOTE: r2:demo-backups
+- DB_PREFIX: demo
 - DB_HOST: dejar vacio para auto-deteccion docker0
 - RETENTION: 30 days
 
@@ -175,6 +184,8 @@ Luego programa tareas operativas:
 ```bash
 sudo bash setup_cron.sh
 ```
+
+Antes de usar el nodo como productivo, ejecuta al menos un backup y un restore de prueba en un tenant de staging.
 
 ## 9. Ajuste de autenticacion PostgreSQL para redes Docker/Coolify
 

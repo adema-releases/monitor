@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # Adema Core - Tenant bootstrap
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 # Uso: sudo ./create_tenant.sh cli003 [DB_PASSWORD] [--password-file RUTA] [--no-password-output]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Adema Core - Common library
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 
 COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MONITOR_DIR="$(cd "$COMMON_DIR/.." && pwd)"

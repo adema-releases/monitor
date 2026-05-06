@@ -25,6 +25,9 @@ sudo journalctl -u adema-web-panel.service -n 100 --no-pager
 
 - URL: `http://[TU_IP_AQUI]:5000/`
 - Se requiere token en cada request
+- En navegador, usa el formulario de login y guarda el token en la sesion del panel.
+- Para API o automatizaciones, prioriza `Authorization: Bearer TU_TOKEN` o `X-ADEMA-TOKEN: TU_TOKEN`.
+- Evita usar `?token=` en URLs reales: puede quedar en historial, logs, capturas o referers.
 
 ## Endpoints API principales
 
@@ -79,9 +82,11 @@ sudo bash setup_web_panel.sh
 
 ## Recomendaciones
 
-1. Exponer el panel detras de VPN o firewall de IP permitidas.
-2. Rotar token periodicamente.
-3. Revisar sudoers despues de cambios de rutas.
+1. Exponer el panel detras de VPN, tunnel seguro o firewall de IP permitidas.
+2. Mantener el puerto `5000` accesible solo desde IPs autorizadas.
+3. Rotar token periodicamente y despues de cualquier sospecha de exposicion.
+4. Revisar sudoers despues de cambios de rutas.
+5. Mantener logs sin passwords ni tokens.
 
 ## Recuperar token actual
 
@@ -118,7 +123,7 @@ Si quieres definir un token manual:
 sudo bash rotate_web_token.sh "TU_TOKEN_LARGO_Y_SEGURO"
 ```
 
-El script actualiza `/etc/adema/web_panel.env`, reinicia `adema-web-panel.service` y muestra la URL final con `?token=`.
+El script actualiza `/etc/adema/web_panel.env`, reinicia `adema-web-panel.service` y muestra la URL base junto con el token. Abre la URL y pega el token en el formulario de login.
 
 ## Reinstalar o reparar panel web
 

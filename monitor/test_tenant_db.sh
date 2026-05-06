@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # Adema Core - DB connectivity test
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 # Uso: ./test_tenant_db.sh cli001 [DB_PASSWORD]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

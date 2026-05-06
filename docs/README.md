@@ -4,9 +4,11 @@ Esta carpeta contiene guias practicas para operar el nodo de forma segura y repe
 
 La idea principal del proyecto es crear una estructura que permita, mediante Coolify, alojar multiples apps Django de manera automatizada sobre VPS. Esta documentacion esta escrita para que otro desarrollador Django pueda levantar un nodo rapido, con estandares de seguridad y procesos claros.
 
+Camino principal para una instalacion nueva: VM Ubuntu 24.04 -> Docker/PostgreSQL/rclone -> Coolify -> `adema-releases/monitor` -> panel web seguro -> backup/restore probado.
+
 ## Indice
 
-1. [Provision y bootstrap del nodo](01-new-node.md)
+1. [Provision y bootstrap del nodo Ubuntu 24.04 + Coolify](01-new-node.md)
 2. [Crear tenant](02-create-tenant.md)
 3. [Eliminar tenant](03-delete-tenant.md)
 4. [Backup y restore](04-backup-restore.md)

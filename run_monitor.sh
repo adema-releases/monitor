@@ -1,6 +1,6 @@
 #!/bin/bash
 # Adema Core - CLI launcher
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$ROOT_DIR/monitor"
@@ -37,21 +37,21 @@ configure_environment() {
     local detected_docker0_ip
     detected_docker0_ip="$(ip -o -4 addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
 
-    local project_code="django"
-    local cluster_id="CLUSTER-DJANGO-01"
-    local db_prefix="django"
-    local db_name_prefix="django_db"
-    local db_user_prefix="user_django"
+    local project_code="demo"
+    local cluster_id="CLUSTER-DEMO-01"
+    local db_prefix="demo"
+    local db_name_prefix="demo_db"
+    local db_user_prefix="demo_user"
     local volume_base_path="/var/lib/docker/volumes"
-    local volume_prefix="django"
+    local volume_prefix="demo"
     local volume_folders="license logs media"
-    local backup_dir="/var/lib/django/backups_locales"
+    local backup_dir="/var/lib/demo/backups_locales"
     local backup_retention_days="7"
-    local backup_remote="r2:django-backups"
+    local backup_remote="r2:demo-backups"
     local rclone_config="/root/.config/rclone/rclone.conf"
     local brevo_recipient=""
     local brevo_sender=""
-    local brevo_sender_name="Adema Core Operaciones"
+    local brevo_sender_name="Adema Core Demo"
     local db_host="${detected_docker0_ip:-127.0.0.1}"
     local ram_threshold_mb="450"
     local exclude_regex="coolify|NAME"

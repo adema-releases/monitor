@@ -1,7 +1,7 @@
 # Security Policy
 
 Proyecto: Adema Core  
-Repositorio oficial: https://github.com/adema-releases/adema-core
+Repositorio oficial: https://github.com/adema-releases/monitor
 
 ## Supported Versions
 
@@ -56,6 +56,8 @@ Se consideran prioridad alta:
 
 - No publicar `monitor/.monitor.secrets` ni `monitor/.monitor.env`.
 - Rotar `ADEMA_WEB_TOKEN` periodicamente.
-- Limitar acceso al panel con red privada/VPN/firewall.
+- Limitar acceso al panel con red privada, VPN, tunnel seguro o firewall con allowlist de IPs.
+- Evitar `?token=` en URLs reales; para API usar `Authorization: Bearer TU_TOKEN` o `X-ADEMA-TOKEN: TU_TOKEN`.
+- Mantener logs sin passwords ni tokens.
 - Probar backup y restore en staging antes de produccion.
 - Mantener PostgreSQL con SCRAM (`password_encryption = 'scram-sha-256'`).

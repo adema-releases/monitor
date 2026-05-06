@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 # Adema Core - Web panel installer
-# Repo oficial: https://github.com/adema-releases/adema-core
+# Repo oficial: https://github.com/adema-releases/monitor
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_USER="adema"
@@ -143,12 +143,12 @@ systemctl enable --now adema-web-panel.service
 SERVER_IP=$(hostname -I | awk '{print $1}')
 PANEL_TOKEN=$(grep '^ADEMA_WEB_TOKEN=' "$ENV_FILE" | cut -d'=' -f2-)
 PANEL_URL="http://${SERVER_IP}:${WEB_PORT}/"
-PANEL_URL_WITH_TOKEN="${PANEL_URL}?token=${PANEL_TOKEN}"
 
 echo "=================================================="
 echo "Adema Core - Control Center instalado correctamente"
 echo "Servicio: adema-web-panel.service"
 echo "URL: ${PANEL_URL}"
-echo "URL (acceso directo): ${PANEL_URL_WITH_TOKEN}"
 echo "Token: ${PANEL_TOKEN}"
+echo "Acceso recomendado: abrir la URL y pegar el token en el login"
+echo "API: Authorization: Bearer <token> o X-ADEMA-TOKEN: <token>"
 echo "=================================================="

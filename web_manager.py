@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adema Core web manager.
 
-Repo oficial: https://github.com/adema-releases/adema-core
+Repo oficial: https://github.com/adema-releases/monitor
 """
 
 import hmac
