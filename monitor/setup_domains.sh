@@ -69,6 +69,7 @@ ADEMA_INFRA_DOMAIN="${ADEMA_INFRA_DOMAIN:-}"
 ADEMA_DEPLOY_DOMAIN="${ADEMA_DEPLOY_DOMAIN:-}"
 ADEMA_PANEL_PORT="${ADEMA_PANEL_PORT:-5000}"
 ADEMA_PANEL_BIND="${ADEMA_PANEL_BIND:-127.0.0.1}"
+ADEMA_COOLIFY_PORT="${ADEMA_COOLIFY_PORT:-8000}"
 
 # ── Leer input interactivo ────────────────────────────────────────────────────
 prompt_if_empty() {
@@ -188,36 +189,50 @@ detect_proxy_on_ports() {
 }
 
 # ── Generar config Nginx ──────────────────────────────────────────────────────
+# Params: domain port bind [conf_name] [ws_upgrade]
+#   conf_name:  nombre base del archivo en sites-available (sin .conf), default: adema-core
+#   ws_upgrade: 1 para WebSocket/Coolify ("upgrade"), 0 para HTTP normal (panel Flask)
 generate_nginx_config() {
-    local infra_domain="$1"
-    local panel_port="$2"
-    local panel_bind="$3"
-    local conf_path="/etc/nginx/sites-available/adema-core.conf"
-    local enabled_path="/etc/nginx/sites-enabled/adema-core.conf"
+    local domain="$1"
+    local port="$2"
+    local bind="$3"
+    local conf_name="${4:-adema-core}"
+    local ws_upgrade="${5:-0}"
+    local conf_path="/etc/nginx/sites-available/${conf_name}.conf"
+    local enabled_path="/etc/nginx/sites-enabled/${conf_name}.conf"
+
+    local connection_header read_timeout
+    if [ "$ws_upgrade" = "1" ]; then
+        connection_header='"upgrade"'
+        read_timeout=120
+    else
+        connection_header="keep-alive"
+        read_timeout=90
+    fi
 
     local nginx_content
-    nginx_content="# Adema Core - Proxy reverso hacia panel web
+    nginx_content="# Adema Core - Proxy reverso
 # Generado por setup_domains.sh
 # https://github.com/adema-releases/monitor
 
 server {
     listen 80;
     listen [::]:80;
-    server_name ${infra_domain};
+    server_name ${domain};
 
     # Redirigir a HTTPS si ya tienes certbot instalado
     # return 301 https://\$host\$request_uri;
 
     location / {
-        proxy_pass http://${panel_bind}:${panel_port};
+        proxy_pass http://${bind}:${port};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection keep-alive;
-        proxy_read_timeout 90;
+        proxy_set_header Connection ${connection_header};
+        proxy_read_timeout ${read_timeout};
         proxy_buffering off;
     }
 }
@@ -672,12 +687,13 @@ prompt_if_empty ADEMA_INFRA_DOMAIN "Dominio panel Adema Core" "${ADEMA_INFRA_DOM
 prompt_if_empty ADEMA_DEPLOY_DOMAIN "Dominio Coolify" "${ADEMA_DEPLOY_DOMAIN}"
 prompt_if_empty ADEMA_PANEL_PORT "Puerto del panel local" "5000"
 prompt_if_empty ADEMA_PANEL_BIND "Bind del panel local" "127.0.0.1"
+prompt_if_empty ADEMA_COOLIFY_PORT "Puerto local de Coolify" "8000"
 
 sep
 log "Configuracion:"
-log "  Dominio infra:  ${ADEMA_INFRA_DOMAIN}"
-log "  Dominio deploy: ${ADEMA_DEPLOY_DOMAIN}"
-log "  Panel local:    http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/"
+log "  Dominio infra:   ${ADEMA_INFRA_DOMAIN}  (panel → :${ADEMA_PANEL_PORT})"
+log "  Dominio deploy:  ${ADEMA_DEPLOY_DOMAIN}  (Coolify → :${ADEMA_COOLIFY_PORT})"
+log "  Panel local:     http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/"
 sep
 
 # Ofrecer guardar en /etc/adema/domains.env
@@ -694,6 +710,7 @@ ADEMA_INFRA_DOMAIN=${ADEMA_INFRA_DOMAIN}
 ADEMA_DEPLOY_DOMAIN=${ADEMA_DEPLOY_DOMAIN}
 ADEMA_PANEL_PORT=${ADEMA_PANEL_PORT}
 ADEMA_PANEL_BIND=${ADEMA_PANEL_BIND}
+ADEMA_COOLIFY_PORT=${ADEMA_COOLIFY_PORT}
 ENVEOF
         chmod 640 "$DOMAINS_ENV_FILE"
         ok "Configuracion guardada en ${DOMAINS_ENV_FILE}"
@@ -742,13 +759,23 @@ case "$PROXY_MODE" in
         fi
 
         sep
-        printf "%b" "  ¿Generar config Nginx para ${ADEMA_INFRA_DOMAIN}? [S/n]: " >&2
+        printf "%b" "  ¿Generar config Nginx para ${ADEMA_INFRA_DOMAIN} (panel → :${ADEMA_PANEL_PORT})? [S/n]: " >&2
         read -r _gen_nginx </dev/tty
         if [[ "${_gen_nginx,,}" != "n" ]]; then
-            generate_nginx_config "$ADEMA_INFRA_DOMAIN" "$ADEMA_PANEL_PORT" "$ADEMA_PANEL_BIND"
+            generate_nginx_config "$ADEMA_INFRA_DOMAIN" "$ADEMA_PANEL_PORT" "$ADEMA_PANEL_BIND" "adema-core" "0"
+        fi
+
+        sep
+        printf "%b" "  ¿Generar config Nginx para ${ADEMA_DEPLOY_DOMAIN} (Coolify → :${ADEMA_COOLIFY_PORT})? [S/n]: " >&2
+        read -r _gen_deploy </dev/tty
+        if [[ "${_gen_deploy,,}" != "n" ]]; then
+            generate_nginx_config "$ADEMA_DEPLOY_DOMAIN" "$ADEMA_COOLIFY_PORT" "127.0.0.1" "coolify-deploy" "1"
         fi
 
         suggest_certbot "$ADEMA_INFRA_DOMAIN"
+        if [ -n "${ADEMA_DEPLOY_DOMAIN:-}" ]; then
+            suggest_certbot "$ADEMA_DEPLOY_DOMAIN"
+        fi
         ;;
 esac
 
