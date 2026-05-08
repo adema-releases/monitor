@@ -51,6 +51,10 @@ SNAPSHOT_TIMEOUT_SEC = int(os.getenv("ADEMA_SNAPSHOT_TIMEOUT_SEC", "12"))
 ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
 DELETE_CONFIRM_TEXT = (os.getenv("ADEMA_DELETE_CONFIRM_TEXT", "BORRAR TENANT") or "BORRAR TENANT").strip()
 MONITOR_ENV_PATH = Path(os.getenv("MONITOR_ENV_FILE", str(MONITOR_DIR / ".monitor.env"))).resolve()
+SETUP_DOMAINS_SCRIPT = ROOT_DIR / "monitor" / "setup_domains.sh"
+
+ADEMA_INFRA_DOMAIN = os.getenv("ADEMA_INFRA_DOMAIN", "").strip()
+ADEMA_DEPLOY_DOMAIN = os.getenv("ADEMA_DEPLOY_DOMAIN", "").strip()
 
 if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
@@ -778,6 +782,54 @@ def index() -> Response:
         </article>
       </section>
 
+      <!-- SECCION: Dominios del nodo -->
+      <section id="domainsSection" class="panel p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h2 class="section-title text-xl">Dominios del nodo</h2>
+          <div class="flex items-center gap-3 flex-wrap">
+            <span id="domainLastCheck" class="muted text-xs hidden"></span>
+            <button id="checkDomainsBtn" class="btn btn-primary text-sm">Verificar estado</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">Infra</h3>
+            <p id="domInfraDomain" class="metric-value text-sm" style="overflow-wrap:anywhere">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">Deploy</h3>
+            <p id="domDeployDomain" class="metric-value text-sm" style="overflow-wrap:anywhere">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">IP publica</h3>
+            <p id="domServerIp" class="metric-value text-sm">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">Panel local</h3>
+            <p id="domPanelStatus" class="metric-value text-sm">-</p>
+          </article>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">DNS infra</h3>
+            <p id="domDnsInfra" class="metric-value text-sm">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">DNS deploy</h3>
+            <p id="domDnsDeploy" class="metric-value text-sm">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">HTTP 80 / 443</h3>
+            <p id="domFirewallHttp" class="metric-value text-sm">-</p>
+          </article>
+          <article class="panel metric-card p-3">
+            <h3 class="metric-label">Proxy</h3>
+            <p id="domProxyMode" class="metric-value text-sm">-</p>
+          </article>
+        </div>
+        <p id="domainStatusNote" class="muted text-xs">Haz click en &ldquo;Verificar estado&rdquo; para revisar DNS, firewall y panel local.</p>
+      </section>
+
       <section class="panel p-5 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h2 class="section-title text-xl">Gestion de Tenants</h2>
@@ -1308,6 +1360,70 @@ def index() -> Response:
       if (e.target === connectionInfoModal) closeConnectionModal();
     });
 
+    // ── Dominios del nodo ──────────────────────────────────────────────────
+    function domBadge(isOk, labelOk, labelFail) {
+      const color = isOk ? 'var(--adema-success)' : 'var(--adema-danger)';
+      return `<span style="color:${color};font-weight:900">${isOk ? escapeHtml(labelOk) : escapeHtml(labelFail)}</span>`;
+    }
+
+    async function refreshDomainStatus() {
+      const btn = document.getElementById('checkDomainsBtn');
+      const note = document.getElementById('domainStatusNote');
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+      note.textContent = 'Consultando...';
+
+      try {
+        const data = await api('/api/domain/status');
+
+        document.getElementById('domInfraDomain').textContent  = data.infra_domain  || '-';
+        document.getElementById('domDeployDomain').textContent = data.deploy_domain || '-';
+        document.getElementById('domServerIp').textContent     = data.server_ip     || '-';
+
+        const panelOk = data.panel?.responding === true;
+        document.getElementById('domPanelStatus').innerHTML = domBadge(panelOk, 'Activo', 'Sin respuesta');
+
+        const dnsInfraOk   = data.dns?.infra_points_to_server  === true;
+        const dnsDeployOk  = data.dns?.deploy_points_to_server === true;
+        document.getElementById('domDnsInfra').innerHTML  = domBadge(dnsInfraOk,  'OK', 'Pendiente');
+        document.getElementById('domDnsDeploy').innerHTML = domBadge(dnsDeployOk, 'OK', 'Pendiente');
+
+        const httpOk  = data.firewall?.http_open  === true;
+        const httpsOk = data.firewall?.https_open === true;
+        const fwLabel = (httpOk && httpsOk) ? '80 + 443' : (!httpOk && !httpsOk ? 'Cerrado' : (httpOk ? '80 ok / 443 cerrado' : '80 cerrado / 443 ok'));
+        document.getElementById('domFirewallHttp').innerHTML = domBadge(httpOk && httpsOk, fwLabel, fwLabel);
+
+        const proxy = data.proxy?.detected || '';
+        const proxyLabels = { coolify: 'Coolify (Modo B)', caddy: 'Caddy (Modo B)', nginx: 'Nginx (Modo A)', free: 'Libre (Modo A)' };
+        const proxyLabel  = proxyLabels[proxy] || (proxy || '-');
+        const proxyOk     = proxy === 'coolify' || proxy === 'nginx' || proxy === 'caddy';
+        document.getElementById('domProxyMode').innerHTML = domBadge(proxyOk, proxyLabel, proxyLabel);
+
+        note.textContent = data.ok
+          ? 'Todo en orden. El nodo esta listo para operar por dominio.'
+          : 'Algunos items necesitan atencion. Consulta docs/09-domain-setup.md.';
+
+        const lastCheckEl = document.getElementById('domainLastCheck');
+        lastCheckEl.textContent = `Ultima verificacion: ${new Date().toLocaleTimeString('es-AR')}`;
+        lastCheckEl.classList.remove('hidden');
+
+      } catch (err) {
+        if (err.status === 404 || (err.message || '').includes('script_not_found')) {
+          note.textContent = 'setup_domains.sh no encontrado. Asegurate de usar el repositorio completo.';
+        } else if (err.status === 401) {
+          localStorage.removeItem('adema_token');
+          showLogin();
+        } else {
+          note.textContent = `Error al verificar: ${err.message || 'sin detalle'}`;
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verificar estado';
+      }
+    }
+
+    document.getElementById('checkDomainsBtn').addEventListener('click', refreshDomainStatus);
+
     // Auto-login si hay token guardado o en la URL
     const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
     if (tokenFromQuery) {
@@ -1569,6 +1685,62 @@ def api_job_log(job_id: str) -> Response:
             "chunk": chunk,
         }
     )
+
+
+@app.get("/api/domain/status")
+@limiter.limit("6 per minute")
+def api_domain_status() -> Response:
+    if not SETUP_DOMAINS_SCRIPT.exists():
+        return jsonify({
+            "ok": False,
+            "error": "script_not_found",
+            "message": (
+                f"setup_domains.sh no encontrado en {SETUP_DOMAINS_SCRIPT}. "
+                "Asegurate de clonar el repo completo y ejecutar desde la raiz correcta."
+            ),
+        }), 404
+
+    env = dict(os.environ)
+    if ADEMA_INFRA_DOMAIN:
+        env["ADEMA_INFRA_DOMAIN"] = ADEMA_INFRA_DOMAIN
+    if ADEMA_DEPLOY_DOMAIN:
+        env["ADEMA_DEPLOY_DOMAIN"] = ADEMA_DEPLOY_DOMAIN
+
+    try:
+        result = run(
+            ["sudo", "-n", "/bin/bash", str(SETUP_DOMAINS_SCRIPT), "--check", "--json"],
+            cwd=str(ROOT_DIR),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+            env=env,
+        )
+    except TimeoutExpired:
+        return jsonify({"ok": False, "error": "timeout", "message": "El chequeo de dominios tardo demasiado (>20s)."}), 504
+    except OSError as exc:
+        return jsonify({"ok": False, "error": "exec_error", "message": str(exc)}), 500
+
+    if result.returncode != 0:
+        raw = (result.stdout or result.stderr or "").strip()
+        # Intentar parsear JSON de error devuelto por el script
+        try:
+            data = json.loads(raw)
+            return jsonify(data), 500
+        except json.JSONDecodeError:
+            pass
+        return jsonify({"ok": False, "error": "check_failed", "message": raw[:500] or "El script de dominios fallo."}), 500
+
+    try:
+        data = json.loads(result.stdout)
+        return jsonify(data)
+    except json.JSONDecodeError:
+        return jsonify({
+            "ok": False,
+            "error": "json_parse_error",
+            "message": "El script no devolvio JSON valido.",
+            "raw": result.stdout[:500],
+        }), 500
 
 
 if __name__ == "__main__":

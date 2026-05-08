@@ -97,6 +97,7 @@ TEST_SCRIPT="$ROOT_DIR/monitor/test_tenant_db.sh"
 BACKUP_SCRIPT="$ROOT_DIR/monitor/backup_project.sh"
 STATUS_SCRIPT="$ROOT_DIR/monitor/status_snapshot.sh"
 DELETE_SCRIPT="$ROOT_DIR/monitor/delete_tenant.sh"
+DOMAINS_SCRIPT="$ROOT_DIR/monitor/setup_domains.sh"
 
 cat > "$SUDOERS_FILE" <<EOF
 # Adema Core Web Panel - sudoers (autogenerado)
@@ -108,6 +109,7 @@ $WEB_USER ALL=(root) NOPASSWD: /bin/bash $CREATE_SCRIPT *
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $TEST_SCRIPT *
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $BACKUP_SCRIPT
 $WEB_USER ALL=(root) NOPASSWD: /bin/bash $DELETE_SCRIPT *
+$WEB_USER ALL=(root) NOPASSWD: /bin/bash $DOMAINS_SCRIPT *
 EOF
 chmod 440 "$SUDOERS_FILE"
 visudo -cf "$SUDOERS_FILE" >/dev/null

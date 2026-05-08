@@ -106,6 +106,29 @@ sudo systemctl status adema-web-panel.service
 - `monitor/monitor_report.sh`: reporte operativo por email (Brevo).
 - `monitor/sentinel_ram.sh`: alerta de RAM por email (Brevo).
 
+## Acceso por dominio
+
+Una vez completada la instalacion y configurados los registros DNS en Cloudflare, el nodo queda accesible por dominios limpios:
+
+| Dominio                          | Destino       |
+|----------------------------------|---------------|
+| `https://deploy.tudominio.com`   | Coolify       |
+| `https://infra.tudominio.com`    | Adema Core    |
+
+Para configurar el acceso por dominio:
+
+```bash
+sudo bash monitor/setup_domains.sh
+```
+
+Para verificar el estado DNS, firewall y panel local:
+
+```bash
+bash monitor/setup_domains.sh --check
+```
+
+Documentacion completa: `docs/09-domain-setup.md`.
+
 ## Prerrequisitos
 
 En la VM Linux donde corren los contenedores:

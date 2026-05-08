@@ -4,6 +4,33 @@ Todos los cambios relevantes de este proyecto se documentan aqui.
 
 ## Unreleased
 
+## 1.2.0 - 2026-05-07
+
+### Added
+
+- Nuevo script `monitor/setup_domains.sh`: asistente interactivo para configurar acceso por dominio al panel y a Coolify, con verificacion DNS, UFW, panel local y deteccion de conflicto con Coolify/Traefik.
+- Nuevo modo `--check --json` en `setup_domains.sh` para devolver estado estructurado en JSON (usado por la API).
+- Nuevo endpoint `GET /api/domain/status` en el panel web: ejecuta el chequeo de dominios y devuelve el estado en JSON.
+- Nueva seccion visual "Dominios del nodo" en el dashboard del panel web con badges de estado en tiempo real.
+- Nueva documentacion operativa: `docs/09-domain-setup.md`.
+
+### Changed
+
+- `setup_web_panel.sh`: agrega permiso sudoers para `setup_domains.sh` al allowlist de scripts autorizados.
+- `README.md`: nueva seccion "Acceso por dominio" con tabla y comandos de referencia.
+- `web_manager.py`: nuevas constantes `SETUP_DOMAINS_SCRIPT`, `ADEMA_INFRA_DOMAIN`, `ADEMA_DEPLOY_DOMAIN`.
+
+### Compatibility
+
+- No se rompen instalaciones existentes: el panel sigue accesible por `IP:5000` si no se configura dominio.
+- No se instala ningun proxy si Coolify/Traefik ya gestiona 80/443.
+- No se abren puertos UFW automaticamente.
+
+### Docs
+
+- Nuevo changelist detallado en `CHANGESET-1.2.0.md`.
+- Nueva guia operativa en `docs/09-domain-setup.md`.
+
 ## 1.1.2 - 2026-05-06
 
 ### Changed
