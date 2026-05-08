@@ -497,11 +497,23 @@ run_checks() {
     deploy_resolved=$(resolve_domain "${ADEMA_DEPLOY_DOMAIN:-}")
 
     local infra_ok="false" deploy_ok="false"
-    if [ -n "$server_ip" ] && [ "$infra_resolved" = "$server_ip" ]; then
-        infra_ok="true"
+    local infra_resolves="false" deploy_resolves="false"
+    local infra_via_proxy="false" deploy_via_proxy="false"
+    if [ -n "$infra_resolved" ]; then
+        infra_resolves="true"
+        if [ -n "$server_ip" ] && [ "$infra_resolved" = "$server_ip" ]; then
+            infra_ok="true"
+        else
+            infra_via_proxy="true"
+        fi
     fi
-    if [ -n "$server_ip" ] && [ "$deploy_resolved" = "$server_ip" ]; then
-        deploy_ok="true"
+    if [ -n "$deploy_resolved" ]; then
+        deploy_resolves="true"
+        if [ -n "$server_ip" ] && [ "$deploy_resolved" = "$server_ip" ]; then
+            deploy_ok="true"
+        else
+            deploy_via_proxy="true"
+        fi
     fi
 
     local http_status https_status
@@ -525,7 +537,8 @@ run_checks() {
     fi
 
     local overall_ok="true"
-    if [ "$infra_ok" = "false" ] || [ "$deploy_ok" = "false" ] || [ "$panel_responding" = "false" ]; then
+    # DNS ok si resuelve a algo (directo o via CDN); panel debe responder
+    if [ "$infra_resolves" = "false" ] || [ "$deploy_resolves" = "false" ] || [ "$panel_responding" = "false" ]; then
         overall_ok="false"
     fi
 
@@ -539,8 +552,12 @@ run_checks() {
         printf '  "dns": {\n'
         printf '    "infra_resolved": "%s",\n'        "$infra_resolved"
         printf '    "deploy_resolved": "%s",\n'       "$deploy_resolved"
+        printf '    "infra_resolves": %s,\n'           "$infra_resolves"
+        printf '    "deploy_resolves": %s,\n'          "$deploy_resolves"
         printf '    "infra_points_to_server": %s,\n'  "$infra_ok"
-        printf '    "deploy_points_to_server": %s\n'  "$deploy_ok"
+        printf '    "deploy_points_to_server": %s,\n' "$deploy_ok"
+        printf '    "infra_via_proxy": %s,\n'          "$infra_via_proxy"
+        printf '    "deploy_via_proxy": %s\n'          "$deploy_via_proxy"
         printf '  },\n'
         printf '  "firewall": {\n'
         printf '    "ufw_http": "%s",\n'              "$http_status"
@@ -576,9 +593,12 @@ run_checks() {
     if [ -n "${ADEMA_INFRA_DOMAIN:-}" ]; then
         if [ "$infra_ok" = "true" ]; then
             ok "${ADEMA_INFRA_DOMAIN} → ${infra_resolved} ✓"
+        elif [ "$infra_via_proxy" = "true" ]; then
+            ok "${ADEMA_INFRA_DOMAIN} → ${infra_resolved} (via CDN/proxy, no IP directa del servidor)"
+            log "El dominio resuelve correctamente. Si usas Cloudflare proxy (nube naranja), la IP que ve dig es de Cloudflare."
         else
-            warn "${ADEMA_INFRA_DOMAIN} → ${infra_resolved:-[sin resolver]} (esperado: ${server_ip:-desconocido})"
-            log "Todavia no apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
+            warn "${ADEMA_INFRA_DOMAIN} → [sin resolver] (esperado: ${server_ip:-desconocido})"
+            log "No apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
         fi
     else
         warn "ADEMA_INFRA_DOMAIN no configurado."
@@ -587,9 +607,12 @@ run_checks() {
     if [ -n "${ADEMA_DEPLOY_DOMAIN:-}" ]; then
         if [ "$deploy_ok" = "true" ]; then
             ok "${ADEMA_DEPLOY_DOMAIN} → ${deploy_resolved} ✓"
+        elif [ "$deploy_via_proxy" = "true" ]; then
+            ok "${ADEMA_DEPLOY_DOMAIN} → ${deploy_resolved} (via CDN/proxy, no IP directa del servidor)"
+            log "El dominio resuelve correctamente. Si usas Cloudflare proxy (nube naranja), la IP que ve dig es de Cloudflare."
         else
-            warn "${ADEMA_DEPLOY_DOMAIN} → ${deploy_resolved:-[sin resolver]} (esperado: ${server_ip:-desconocido})"
-            log "Todavia no apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
+            warn "${ADEMA_DEPLOY_DOMAIN} → [sin resolver] (esperado: ${server_ip:-desconocido})"
+            log "No apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
         fi
     else
         warn "ADEMA_DEPLOY_DOMAIN no configurado."
@@ -620,8 +643,10 @@ run_checks() {
     sep
     title "Resumen"
     hr
-    [ "$infra_ok" = "true" ]       && ok  "DNS infra:     OK"   || warn "DNS infra:     pendiente"
-    [ "$deploy_ok" = "true" ]      && ok  "DNS deploy:    OK"   || warn "DNS deploy:    pendiente"
+    [ "$infra_ok" = "true" ]         && ok  "DNS infra:     OK (directo)" \
+      || { [ "$infra_via_proxy" = "true" ] && ok "DNS infra:     OK (via CDN/proxy)" || warn "DNS infra:     pendiente (sin resolver)"; }
+    [ "$deploy_ok" = "true" ]         && ok  "DNS deploy:    OK (directo)" \
+      || { [ "$deploy_via_proxy" = "true" ] && ok "DNS deploy:    OK (via CDN/proxy)" || warn "DNS deploy:    pendiente (sin resolver)"; }
     [ "$http_open" = "true" ]      && ok  "UFW 80/tcp:    abierto" || warn "UFW 80/tcp:    cerrado"
     [ "$https_open" = "true" ]     && ok  "UFW 443/tcp:   abierto" || warn "UFW 443/tcp:   cerrado"
     [ "$panel_responding" = "true" ] && ok "Panel local:   activo"  || warn "Panel local:   sin respuesta"

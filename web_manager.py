@@ -1385,8 +1385,12 @@ def index() -> Response:
 
         const dnsInfraOk   = data.dns?.infra_points_to_server  === true;
         const dnsDeployOk  = data.dns?.deploy_points_to_server === true;
-        document.getElementById('domDnsInfra').innerHTML  = domBadge(dnsInfraOk,  'OK', 'Pendiente');
-        document.getElementById('domDnsDeploy').innerHTML = domBadge(dnsDeployOk, 'OK', 'Pendiente');
+        const dnsInfraProxy  = data.dns?.infra_via_proxy  === true;
+        const dnsDeployProxy = data.dns?.deploy_via_proxy === true;
+        const dnsInfraLabel  = dnsInfraOk  ? 'OK' : (dnsInfraProxy  ? 'OK (vía CDN)' : 'Pendiente');
+        const dnsDeployLabel = dnsDeployOk ? 'OK' : (dnsDeployProxy ? 'OK (vía CDN)' : 'Pendiente');
+        document.getElementById('domDnsInfra').innerHTML  = domBadge(dnsInfraOk  || dnsInfraProxy,  dnsInfraLabel,  dnsInfraLabel);
+        document.getElementById('domDnsDeploy').innerHTML = domBadge(dnsDeployOk || dnsDeployProxy, dnsDeployLabel, dnsDeployLabel);
 
         const httpOk  = data.firewall?.http_open  === true;
         const httpsOk = data.firewall?.https_open === true;
