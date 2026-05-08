@@ -1305,7 +1305,7 @@ def index() -> Response:
       }
     }
 
-    document.getElementById("saveTokenBtn").addEventListener("click", tryLogin);
+    document.getElementById("saveTokenBtn").addEventListener("click", () => tryLogin());
     document.getElementById("tokenInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") tryLogin();
     });
