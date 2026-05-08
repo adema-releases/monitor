@@ -628,8 +628,15 @@ if [ "$MODE_CHECK" -eq 1 ]; then
             printf '{"ok":false,"error":"domains_not_configured","message":"ADEMA_BASE_DOMAIN no definido. Define la variable o crea /etc/adema/domains.env."}\n'
             exit 0
         fi
-        err_msg "ADEMA_BASE_DOMAIN no definido."
-        log "Define la variable de entorno o crea el archivo: /etc/adema/domains.env"
+        err_msg "ADEMA_BASE_DOMAIN no definido y no se encontro ${DOMAINS_ENV_FILE}."
+        log "Opciones:"
+        echo "  1) Correr el asistente interactivo para generarlo automaticamente:" >&2
+        echo "       sudo bash monitor/setup_domains.sh" >&2
+        echo "" >&2
+        echo "  2) Crearlo manualmente desde el template:" >&2
+        echo "       sudo mkdir -p /etc/adema" >&2
+        echo "       sudo cp ${SCRIPT_DIR}/.domains.env.example /etc/adema/domains.env" >&2
+        echo "       sudo nano /etc/adema/domains.env" >&2
         exit 1
     fi
 
@@ -649,6 +656,13 @@ title "Adema Core - Configuracion de dominios"
 hr
 log "Este asistente configura acceso por dominio al panel y a Coolify."
 log "Puedes cancelar en cualquier momento con Ctrl+C."
+if [ ! -f "$DOMAINS_ENV_FILE" ]; then
+    sep
+    log "No se encontro ${DOMAINS_ENV_FILE}."
+    log "Al finalizar, el asistente ofrecera guardarlo. Si prefieres crearlo manualmente:"
+    echo "    sudo cp ${SCRIPT_DIR}/.domains.env.example /etc/adema/domains.env" >&2
+    echo "    sudo nano /etc/adema/domains.env" >&2
+fi
 sep
 
 prompt_if_empty ADEMA_BASE_DOMAIN "Dominio base del servidor (ej: ademasistemas.com)" ""
