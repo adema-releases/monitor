@@ -53,39 +53,63 @@ sudo bash monitor/setup_domains.sh   # el asistente ofrece guardar en /etc/adema
 
 Entra al panel de Cloudflare → selecciona tu dominio → **DNS → Registros**.
 
-Agrega dos registros tipo A:
-
-### Registro para el panel (infra)
-
-| Campo    | Valor                                   |
-|----------|-----------------------------------------|
-| Tipo     | `A`                                     |
-| Nombre   | `infra`                                 |
-| Contenido| IP pública del servidor (ej: `24.199.105.64`) |
-| TTL      | Auto                                    |
-| Proxy    | **Nube gris (DNS only)**                |
-
-### Registro para Coolify (deploy)
-
-| Campo    | Valor                                   |
-|----------|-----------------------------------------|
-| Tipo     | `A`                                     |
-| Nombre   | `deploy`                                |
-| Contenido| IP pública del servidor (ej: `24.199.105.64`) |
-| TTL      | Auto                                    |
-| Proxy    | **Nube gris (DNS only)**                |
-
-### ¿Por que "DNS only" y no proxied?
-
-Coolify usa Traefik con certificados Let's Encrypt (ACME). La validacion ACME requiere que el servidor pueda responder directamente en el puerto 80. Si el proxy de Cloudflare esta activo (nube naranja), Cloudflare intercepta el trafico y la validacion puede fallar.
-
-Una vez que el SSL este activo y estable, puedes activar el proxy de Cloudflare si lo deseas. Pero para el flujo inicial, usa **DNS only**.
-
 Para obtener la IP pública del servidor:
 
 ```bash
 curl -4 ifconfig.me
 ```
+
+### Opción recomendada: registro wildcard (para dominios dedicados al nodo)
+
+Si el dominio se usa exclusivamente para este nodo (por ejemplo `ademawebsites.com.ar`), el enfoque más práctico es un **registro wildcard** que cubre todos los subdominios de forma automática:
+
+| Campo     | Valor                                         |
+|-----------|-----------------------------------------------|
+| Tipo      | `A`                                           |
+| Nombre    | `*` (asterisco)                               |
+| Contenido | IP pública del servidor (ej: `24.199.105.64`) |
+| TTL       | Auto                                          |
+| Proxy     | **Nube gris (DNS only)**                      |
+
+**Registro raíz (opcional pero recomendado):**
+
+| Campo     | Valor                                         |
+|-----------|-----------------------------------------------|
+| Tipo      | `A`                                           |
+| Nombre    | `@` (o el dominio raíz)                       |
+| Contenido | IP pública del servidor (ej: `24.199.105.64`) |
+| TTL       | Auto                                          |
+| Proxy     | **Nube gris (DNS only)**                      |
+
+Con estos dos registros, `infra.tudominio.com`, `deploy.tudominio.com` y cualquier subdominio que configures en Coolify quedan resueltos automáticamente sin agregar otro registro en Cloudflare.
+
+> **El wildcard solo resuelve DNS.** Cada aplicación en Coolify sigue necesitando tener su dominio configurado en la UI de Coolify (o en el archivo Traefik) para que el proxy la enrute correctamente.
+
+### Alternativa: registros A explícitos (para dominios compartidos)
+
+Si el dominio ya tiene otros servicios en subdominios que apuntan a proveedores distintos, usá registros A explícitos por subdominio. Ambos enfoques pueden coexistir: el wildcard cubre los subdominios que no tengan un registro propio, y los registros explícitos tienen prioridad sobre el wildcard.
+
+| Campo     | Valor                                         |
+|-----------|-----------------------------------------------|
+| Tipo      | `A`                                           |
+| Nombre    | `infra`                                       |
+| Contenido | IP pública del servidor (ej: `24.199.105.64`) |
+| TTL       | Auto                                          |
+| Proxy     | **Nube gris (DNS only)**                      |
+
+| Campo     | Valor                                         |
+|-----------|-----------------------------------------------|
+| Tipo      | `A`                                           |
+| Nombre    | `deploy`                                      |
+| Contenido | IP pública del servidor (ej: `24.199.105.64`) |
+| TTL       | Auto                                          |
+| Proxy     | **Nube gris (DNS only)**                      |
+
+### ¿Por qué "DNS only" y no proxied?
+
+Coolify usa Traefik con certificados Let's Encrypt (ACME). La validación ACME requiere que el servidor pueda responder directamente en el puerto 80. Si el proxy de Cloudflare está activo (nube naranja), Cloudflare intercepta el tráfico y la validación puede fallar.
+
+Una vez que el SSL esté activo y estable, podés activar el proxy de Cloudflare si lo deseás. Pero para el flujo inicial, usá **DNS only**.
 
 ---
 

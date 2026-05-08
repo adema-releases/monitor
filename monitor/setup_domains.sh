@@ -319,21 +319,36 @@ print_cloudflare_instructions() {
     hr
     log "Ingresa al panel de Cloudflare → Dominio: ${BOLD}${base_domain}${RESET} → DNS → Registros"
     sep
-    echo -e "  ${BOLD}Registro 1 — Panel Adema Core${RESET}" >&2
+    log "Si ${BOLD}${base_domain}${RESET} es un dominio dedicado a este nodo (sin otros servicios externos),"
+    log "la forma mas simple es un ${BOLD}registro wildcard${RESET} que cubre todos los subdominios:"
+    sep
+    echo -e "  ${BOLD}Registro recomendado — Wildcard (cubre todos los subdominios)${RESET}" >&2
     echo -e "    Tipo:      ${CYAN}A${RESET}" >&2
-    echo -e "    Nombre:    ${CYAN}${infra_name}${RESET}" >&2
+    echo -e "    Nombre:    ${CYAN}*${RESET}  (asterisco)" >&2
     echo -e "    Contenido: ${CYAN}${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}${RESET}" >&2
     echo -e "    TTL:       Auto" >&2
-    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}  ← recomendado para SSL directo con certbot" >&2
+    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}  ← requerido para SSL con certbot/Traefik" >&2
     sep
-    echo -e "  ${BOLD}Registro 2 — Coolify${RESET}" >&2
+    echo -e "  ${BOLD}Registro opcional — Raiz del dominio${RESET}" >&2
     echo -e "    Tipo:      ${CYAN}A${RESET}" >&2
-    echo -e "    Nombre:    ${CYAN}${deploy_name}${RESET}" >&2
+    echo -e "    Nombre:    ${CYAN}@${RESET}  (raiz)" >&2
     echo -e "    Contenido: ${CYAN}${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}${RESET}" >&2
     echo -e "    TTL:       Auto" >&2
-    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}  ← Coolify gestiona su propio SSL" >&2
+    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}" >&2
     sep
-    warn "¿Por qué DNS only?  Coolify y certbot necesitan resolver el IP real del servidor."
+    log "Con el wildcard, ${CYAN}${infra_domain}${RESET} y ${CYAN}${deploy_domain}${RESET} quedan resueltos"
+    log "automaticamente. Cualquier nueva app en Coolify tambien queda cubierta sin tocar Cloudflare."
+    sep
+    warn "El wildcard SOLO resuelve DNS. Cada app sigue necesitando configurar"
+    warn "su dominio en la UI de Coolify (o en el archivo Traefik) para que el proxy la enrute."
+    sep
+    log "Si ${BOLD}${base_domain}${RESET} ya tiene otros servicios en subdominios que apuntan a proveedores"
+    log "distintos, podes usar registros A explicitos en lugar del wildcard:"
+    echo -e "    ${CYAN}${infra_name}${RESET} → ${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}  (panel Adema Core)" >&2
+    echo -e "    ${CYAN}${deploy_name}${RESET} → ${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}  (Coolify)" >&2
+    log "Ambos enfoques son validos y pueden coexistir si es necesario."
+    sep
+    warn "¿Por que DNS only?  Coolify y certbot necesitan resolver el IP real del servidor."
     warn "Activar el proxy de Cloudflare puede interferir con la validacion ACME de Let's Encrypt."
     warn "Una vez con SSL estable, puedes activar el proxy de Cloudflare si lo deseas."
     hr

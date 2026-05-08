@@ -360,6 +360,7 @@
                             <li>Abre en navegador la URL que informa el instalador de Coolify. En tu caso, usa <span class="font-mono">http://IP_PUBLICA:3000</span>.</li>
                             <li>Si no responde, valida firewall/puerto: <span class="font-mono">sudo ufw allow 3000/tcp</span> y vuelve a probar.</li>
                             <li>Dentro del panel: crea usuario administrador y guarda URL, email, password y token en tu gestor de claves.</li>
+                            <li>Una vez configurado el dominio (paso 6), Coolify quedará disponible en <span class="font-mono">https://deploy.tudominio.com</span>.</li>
                         </ol>
                     </div>
                 </div>
@@ -390,6 +391,64 @@
 
             <div class="flex gap-6">
                 <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">6</div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2 text-slate-900">Apuntar dominio al nodo (Cloudflare)</h3>
+                    <p class="text-slate-600 mb-4">Con el nodo funcionando, apunta un dominio para acceder por HTTPS en lugar de <span class="font-mono">http://IP:puerto</span>. Un solo registro wildcard en Cloudflare cubre todos los subdominios del nodo.</p>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700">
+                        <p class="font-semibold text-slate-900 mb-2">Registro recomendado en Cloudflare (dominio dedicado al nodo)</p>
+                        <table class="w-full text-xs mt-2">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-left text-slate-500">
+                                    <th class="py-1 pr-3">Tipo</th>
+                                    <th class="py-1 pr-3">Nombre</th>
+                                    <th class="py-1 pr-3">Contenido</th>
+                                    <th class="py-1">Proxy</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-700">
+                                <tr class="border-b border-slate-100">
+                                    <td class="py-1 pr-3 font-mono">A</td>
+                                    <td class="py-1 pr-3 font-mono text-indigo-700">*</td>
+                                    <td class="py-1 pr-3 font-mono">IP pública del servidor</td>
+                                    <td class="py-1 font-semibold text-amber-700">DNS only</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1 pr-3 font-mono">A</td>
+                                    <td class="py-1 pr-3 font-mono text-indigo-700">@</td>
+                                    <td class="py-1 pr-3 font-mono">IP pública del servidor</td>
+                                    <td class="py-1 font-semibold text-amber-700">DNS only</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="mt-3 text-slate-600">El wildcard <span class="font-mono">*</span> cubre <span class="font-mono">infra.</span>, <span class="font-mono">deploy.</span> y cualquier app que configures en Coolify, sin agregar un registro por cada una.</p>
+                        <p class="mt-2 text-slate-600"><strong>Nota:</strong> el wildcard solo resuelve DNS. Cada app sigue necesitando configurar su dominio en la UI de Coolify para que el proxy la enrute. Para dominios que ya tienen otros servicios externos en subdominios, usá registros A individuales (ver <a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/docs/09-domain-setup.md" target="_blank" rel="noopener noreferrer">docs/09-domain-setup.md</a>).</p>
+                    </div>
+                    <div class="copy-block relative bg-slate-900 p-4 pr-14 rounded-lg font-mono text-sm text-indigo-300 mt-4">
+                        # Asistente interactivo: configura dominios y genera /etc/adema/domains.env<br>
+                        sudo bash monitor/setup_domains.sh<br>
+                        <br>
+                        # Verificar estado de DNS, firewall y panel<br>
+                        bash monitor/setup_domains.sh --check
+                    </div>
+                    <div class="mt-3">
+                        <div class="group relative inline-block">
+                            <button type="button" aria-label="Ayuda del comando" class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 font-bold text-sm">?</button>
+                            <div class="pointer-events-none absolute left-0 z-20 mt-2 hidden w-[min(44rem,92vw)] rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl group-hover:block group-focus-within:block">
+                                <p><strong>Que hace:</strong> asistente interactivo que solicita el dominio base, genera <span class="font-mono">/etc/adema/domains.env</span>, imprime las instrucciones exactas para Cloudflare, verifica DNS/firewall/panel y configura el proxy reverso (Nginx o Coolify).</p>
+                                <p class="mt-2"><strong>Herramientas:</strong></p>
+                                <ul class="mt-1 list-disc list-inside space-y-1">
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://github.com/adema-releases/monitor/blob/main/monitor/setup_domains.sh" target="_blank" rel="noopener noreferrer">setup_domains.sh</a>: asistente de configuracion de dominios y proxy reverso.</li>
+                                    <li><a class="text-indigo-700 hover:text-indigo-900" href="https://certbot.eff.org/" target="_blank" rel="noopener noreferrer">certbot</a>: emision de certificados SSL via Let's Encrypt (sugerido por el script, no ejecutado automaticamente).</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 mt-4">Resultado: el panel queda en <span class="font-mono">https://infra.tudominio.com</span> y Coolify en <span class="font-mono">https://deploy.tudominio.com</span>. El puerto 5000 nunca se abre publicamente.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-6">
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">7</div>
                 <div>
                     <h3 class="text-xl font-bold mb-2 text-slate-900">Clonar este repo y preparar variables/secretos</h3>
                     <p class="text-slate-600 mb-4">Con el nodo listo, clona el proyecto y ejecuta el asistente para generar <span class="font-mono">.monitor.env</span> y <span class="font-mono">.monitor.secrets</span>.</p>
@@ -468,7 +527,7 @@
             </div>
 
             <div class="flex gap-6">
-                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">7</div>
+                <div class="flex-none w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">8</div>
                 <div>
                     <h3 class="text-xl font-bold mb-2 text-slate-900">Enlazar tu repositorio en Coolify y validar</h3>
                     <p class="text-slate-600 mb-4">En Coolify: Sources -> Add Source (GitHub/GitLab) -> autorizar acceso al repo -> crear recurso de app Django. Luego valida salud del nodo.</p>
@@ -512,7 +571,7 @@
                     <h3 class="text-lg font-semibold mb-3">Checklist de Produccion</h3>
                     <ol class="text-sm text-indigo-100 space-y-2 list-decimal list-inside">
                         <li>Token del panel guardado en ubicacion segura.</li>
-                        <li>Firewall restringiendo puerto 5000 o acceso por VPN.</li>
+                        <li>Panel accesible via <span class="font-mono">https://infra.tudominio.com</span> (puerto 5000 cerrado al público).</li>
                         <li>Cron activo para backup, monitor report y sentinel.</li>
                         <li>Restore probado en tenant de staging.</li>
                     </ol>
@@ -659,6 +718,7 @@
                 <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/06-web-panel.md" target="_blank" rel="noopener noreferrer">06-web-panel.md</a></li>
                 <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/07-go-live-checklist.md" target="_blank" rel="noopener noreferrer">07-go-live-checklist.md</a></li>
                 <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/08-master-node-federation.md" target="_blank" rel="noopener noreferrer">08-master-node-federation.md</a></li>
+                <li><a class="text-indigo-700 hover:text-indigo-900 font-medium" href="https://github.com/adema-releases/monitor/blob/main/docs/09-domain-setup.md" target="_blank" rel="noopener noreferrer">09-domain-setup.md</a></li>
             </ul>
         </section>
     </main>
