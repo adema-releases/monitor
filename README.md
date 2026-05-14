@@ -51,6 +51,40 @@ sudo adema-node doctor
 
 Guia de seguridad y hardening: [README_SEGURIDAD.md](README_SEGURIDAD.md).
 
+## Cambiar dominio del nodo
+
+Si instalaste el nodo con un dominio incorrecto o vencido, no edites `/etc/adema/node.env` a mano. Usa la operacion auditada:
+
+```bash
+sudo adema-node change-domain excel-ente.com.ar
+```
+
+Esto actualiza `/etc/adema/node.env` y `/etc/adema/domains.env`, creando backups timestamp antes de escribir. Deriva automaticamente:
+
+```bash
+ADEMA_BASE_DOMAIN=excel-ente.com.ar
+ADEMA_INFRA_DOMAIN=infra.excel-ente.com.ar
+ADEMA_DEPLOY_DOMAIN=deploy.excel-ente.com.ar
+```
+
+Opciones utiles:
+
+```bash
+sudo adema-node change-domain excel-ente.com.ar --dry-run
+sudo adema-node change-domain excel-ente.com.ar --yes
+sudo adema-node change-domain --check-only
+sudo adema-node domain-set excel-ente.com.ar
+```
+
+No cambia `ADEMA_NODE_UUID`, `ADEMA_NODE_ID`, `CLUSTER_ID`, `PROJECT_CODE`, `BACKUP_REMOTE` ni tenants existentes. Despues valida DNS y salud del nodo:
+
+```bash
+bash /opt/adema-node/monitor/setup_domains.sh --check
+sudo adema-node doctor
+```
+
+DNS recomendado: `A @ -> IP_PUBLICA` y `A * -> IP_PUBLICA`, o explicitos `A infra -> IP_PUBLICA` y `A deploy -> IP_PUBLICA`. Si Cloudflare esta en proxy/CDN, los chequeos pueden advertir IP distinta; confirma que el origen apunte al nodo correcto. Tenants ya creados deben actualizar dominio/env en Coolify.
+
 Identidad publica recomendada:
 
 - Producto: Adema Core

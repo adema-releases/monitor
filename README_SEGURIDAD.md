@@ -153,6 +153,91 @@ sudo adema-node backup
 
 No uses `--force` en backup para resolver una duda. Usalo solo si confirmaste que ese remote debe reasignarse al nodo actual.
 
+### Cambiar dominio del nodo
+
+Usa esta operacion cuando el nodo fue instalado con un dominio incorrecto, vencido o temporal y necesitas cambiarlo sin editar archivos a mano.
+
+Ejemplo real:
+
+```bash
+sudo adema-node change-domain excel-ente.com.ar
+```
+
+Alias equivalente:
+
+```bash
+sudo adema-node domain-set excel-ente.com.ar
+```
+
+Por defecto deriva:
+
+```bash
+ADEMA_BASE_DOMAIN=excel-ente.com.ar
+ADEMA_INFRA_DOMAIN=infra.excel-ente.com.ar
+ADEMA_DEPLOY_DOMAIN=deploy.excel-ente.com.ar
+```
+
+Tambien puedes definir dominios explicitos:
+
+```bash
+sudo adema-node change-domain excel-ente.com.ar \
+  --infra-domain infra.excel-ente.com.ar \
+  --deploy-domain deploy.excel-ente.com.ar
+```
+
+Antes de escribir, puedes simular:
+
+```bash
+sudo adema-node change-domain excel-ente.com.ar --dry-run
+```
+
+Para revisar el estado actual sin cambiar nada:
+
+```bash
+sudo adema-node change-domain --check-only
+```
+
+Que cambia:
+
+- `/etc/adema/node.env`: `ADEMA_BASE_DOMAIN`, `ADEMA_INFRA_DOMAIN`, `ADEMA_DEPLOY_DOMAIN`.
+- `/etc/adema/domains.env`: dominios y defaults seguros de panel/deploy.
+- Crea backups timestamp antes de modificar: `/etc/adema/node.env.bak.YYYYMMDD-HHMMSS` y `/etc/adema/domains.env.bak.YYYYMMDD-HHMMSS`.
+- Registra auditoria `domain_changed` en `/var/log/adema-node/audit.jsonl` sin secretos.
+
+Que no cambia:
+
+- `ADEMA_NODE_UUID`.
+- `ADEMA_NODE_ID`.
+- `CLUSTER_ID`.
+- `PROJECT_CODE`.
+- `BACKUP_REMOTE`.
+- Tenants existentes.
+
+Validacion despues del cambio:
+
+```bash
+bash /opt/adema-node/monitor/setup_domains.sh --check
+sudo adema-node doctor
+```
+
+DNS sugerido:
+
+```text
+A @      -> IP_PUBLICA
+A *      -> IP_PUBLICA
+```
+
+O registros explicitos:
+
+```text
+A infra  -> IP_PUBLICA
+A deploy -> IP_PUBLICA
+```
+
+Si usas Cloudflare en proxy/CDN, `doctor` puede mostrar WARN porque el dominio resuelve a IPs de Cloudflare y no a la IP directa del nodo. Eso esta bien si Cloudflare Access/proxy esta configurado; valida que el origen apunte al nodo correcto y que HTTPS funcione.
+
+Importante: si ya creaste tenants antes del cambio, actualiza sus dominios/env en Coolify. Este comando no modifica apps ni tenants automaticamente.
+
 ## 2. Matriz de riesgos
 
 | Riesgo | Impacto | Probabilidad | Mitigacion | Prioridad |
