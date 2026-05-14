@@ -16,6 +16,10 @@ Camino principal para una instalacion nueva: VM Ubuntu 24.04 -> Docker/PostgreSQ
 6. [Panel web seguro](06-web-panel.md)
 7. [Checklist de salida a produccion](07-go-live-checklist.md)
 8. [Federacion de nodos con master](08-master-node-federation.md)
+9. [Arquitectura Coolify/Traefik](architecture.md)
+10. [DNS en Cloudflare](cloudflare-dns.md)
+11. [Despliegue en Coolify](coolify-deployment.md)
+12. [Configuracion de dominios](09-domain-setup.md)
 
 ## Convenciones
 

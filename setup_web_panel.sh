@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_USER="adema"
 WEB_GROUP="adema"
+WEB_HOST="${ADEMA_WEB_HOST:-127.0.0.1}"
 WEB_PORT="${ADEMA_WEB_PORT:-5000}"
 VENV_DIR="$ROOT_DIR/.venv_web_panel"
 ENV_DIR="/etc/adema"
@@ -30,23 +31,37 @@ if ! id -u "$WEB_USER" >/dev/null 2>&1; then
     useradd -m -s /bin/bash "$WEB_USER"
 fi
 
-if ! id -nG "$WEB_USER" | grep -qw sudo; then
-    usermod -aG sudo "$WEB_USER"
-fi
-
 mkdir -p "$ENV_DIR"
 
 if [ ! -f "$ENV_FILE" ]; then
     TOKEN=$(openssl rand -hex 32)
     cat > "$ENV_FILE" <<EOF
 ADEMA_WEB_TOKEN=$TOKEN
-ADEMA_WEB_HOST=0.0.0.0
+ADEMA_WEB_HOST=$WEB_HOST
 ADEMA_WEB_PORT=$WEB_PORT
+ADEMA_ALLOW_QUERY_TOKEN=0
 ADEMA_MAX_JOBS=4
 ADEMA_MIN_BACKUP_FREE_MB=500
 ADEMA_ENV_FILE=$ENV_FILE
+ADEMA_MONITOR_DIR=$ROOT_DIR/monitor
+MONITOR_ENV_FILE=$ROOT_DIR/monitor/.monitor.env
 EOF
 fi
+
+upsert_env() {
+    local key="$1"
+    local value="$2"
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        sed -i -E "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+    fi
+}
+
+upsert_env ADEMA_WEB_HOST "$WEB_HOST"
+upsert_env ADEMA_ALLOW_QUERY_TOKEN "0"
+upsert_env ADEMA_MONITOR_DIR "$ROOT_DIR/monitor"
+upsert_env MONITOR_ENV_FILE "$ROOT_DIR/monitor/.monitor.env"
 
 chown root:"$WEB_GROUP" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
@@ -88,9 +103,11 @@ if command -v ufw >/dev/null 2>&1; then
 fi
 
 chown -R "$WEB_USER":"$WEB_GROUP" "$VENV_DIR"
-chown "$WEB_USER":"$WEB_GROUP" "$ROOT_DIR/web_manager.py"
+chown root:root "$ROOT_DIR/web_manager.py"
+chmod 644 "$ROOT_DIR/web_manager.py"
 mkdir -p "$ROOT_DIR/.web_jobs"
 chown -R "$WEB_USER":"$WEB_GROUP" "$ROOT_DIR/.web_jobs"
+chmod 750 "$ROOT_DIR/.web_jobs"
 
 CREATE_SCRIPT="$ROOT_DIR/monitor/create_tenant.sh"
 TEST_SCRIPT="$ROOT_DIR/monitor/test_tenant_db.sh"
@@ -98,6 +115,14 @@ BACKUP_SCRIPT="$ROOT_DIR/monitor/backup_project.sh"
 STATUS_SCRIPT="$ROOT_DIR/monitor/status_snapshot.sh"
 DELETE_SCRIPT="$ROOT_DIR/monitor/delete_tenant.sh"
 DOMAINS_SCRIPT="$ROOT_DIR/monitor/setup_domains.sh"
+
+for critical_script in "$CREATE_SCRIPT" "$TEST_SCRIPT" "$BACKUP_SCRIPT" "$STATUS_SCRIPT" "$DELETE_SCRIPT" "$DOMAINS_SCRIPT" "$ROOT_DIR/web_manager.py"; do
+    if [ -f "$critical_script" ]; then
+        chown root:root "$critical_script"
+        chmod 755 "$critical_script"
+    fi
+done
+chmod 644 "$ROOT_DIR/web_manager.py"
 
 cat > "$SUDOERS_FILE" <<EOF
 # Adema Core Web Panel - sudoers (autogenerado)
@@ -125,7 +150,7 @@ User=$WEB_USER
 Group=$WEB_GROUP
 WorkingDirectory=$ROOT_DIR
 EnvironmentFile=$ENV_FILE
-ExecStart=$VENV_DIR/bin/waitress-serve --listen=0.0.0.0:$WEB_PORT web_manager:app
+ExecStart=$VENV_DIR/bin/waitress-serve --listen=$WEB_HOST:$WEB_PORT web_manager:app
 Restart=on-failure
 RestartSec=2
 # Cambios de seguridad para permitir ejecucion en /home
@@ -144,13 +169,14 @@ systemctl enable --now adema-web-panel.service
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 PANEL_TOKEN=$(grep '^ADEMA_WEB_TOKEN=' "$ENV_FILE" | cut -d'=' -f2-)
-PANEL_URL="http://${SERVER_IP}:${WEB_PORT}/"
+PANEL_URL="http://${WEB_HOST}:${WEB_PORT}/"
 
 echo "=================================================="
 echo "Adema Core - Control Center instalado correctamente"
 echo "Servicio: adema-web-panel.service"
-echo "URL: ${PANEL_URL}"
+echo "URL local/privada: ${PANEL_URL}"
 echo "Token: ${PANEL_TOKEN}"
-echo "Acceso recomendado: abrir la URL y pegar el token en el login"
+echo "Acceso publico recomendado: HTTPS detras de Cloudflare Access, VPN, Tailscale o allowlist IP."
+echo "No abras 5000/tcp publicamente. Bind actual: ${WEB_HOST}:${WEB_PORT}."
 echo "API: Authorization: Bearer <token> o X-ADEMA-TOKEN: <token>"
 echo "=================================================="

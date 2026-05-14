@@ -17,9 +17,20 @@ Checklist final antes de dar de alta la primera app en el nodo.
 
 ## 3. Panel web
 
-- [ ] `sudo systemctl status adema-web-panel.service` en `active (running)`
+- [ ] Monitor publicado como app en Coolify
+- [ ] `https://monitor.ademasistemas.com/healthz` responde
 - [ ] Token guardado de forma segura
-- [ ] Acceso a `http://IP:5000` limitado por firewall o VPN
+- [ ] Puerto `5000` no expuesto publicamente
+- [ ] Coolify/Traefik maneja `80/443`
+- [ ] Nginx del host deshabilitado o inactivo
+
+## 3.1 DNS y proxy
+
+- [ ] Cloudflare tiene `A @` hacia la IP del nodo
+- [ ] Cloudflare tiene `A *` hacia la IP del nodo
+- [ ] `deploy.ademasistemas.com` apunta al panel Coolify
+- [ ] `monitor.ademasistemas.com` apunta al monitor ADEMA
+- [ ] MX/TXT/DKIM/SPF/DMARC/Brevo/Zoho no fueron modificados
 
 ## 4. Prueba funcional minima
 

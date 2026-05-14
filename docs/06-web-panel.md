@@ -238,13 +238,15 @@ sudo bash setup_web_panel.sh
 sudo visudo -cf /etc/sudoers.d/adema-monitor-web
 ```
 
-### El panel funciona local pero no desde Internet
+### El panel funciona local pero no desde el dominio
 
-1. Verifica firewall:
+1. Verifica que Coolify/Traefik publique el dominio del monitor:
 
 ```bash
 sudo ufw status
-sudo ufw allow 5000/tcp
+bash scripts/diagnose_node.sh
 ```
 
-2. Confirma reglas del proveedor cloud (Security Group / ACL).
+2. No abras `5000/tcp` publicamente. El acceso externo debe ser `https://monitor.ademasistemas.com` mediante Coolify/Traefik.
+
+3. Confirma reglas del proveedor cloud (Security Group / ACL) para `22/tcp`, `80/tcp` y `443/tcp`.

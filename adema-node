@@ -1,0 +1,74 @@
+#!/bin/bash
+set -euo pipefail
+# ADEMA Node Lite - wrapper operativo
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+MONITOR_DIR="$ROOT_DIR/monitor"
+
+usage() {
+    cat <<HELP
+Uso: sudo adema-node COMANDO [args]
+
+Comandos:
+  doctor
+  create-tenant CLIENT_ID [--no-password-output]
+  backup
+  status
+  generate-env CLIENT_ID [--no-password-output]
+  restore-tenant CLIENT_ID YYYY-MM-DD archivo.sql.gz [flags]
+  delete-tenant CLIENT_ID
+  web-panel-install
+  rotate-token
+HELP
+}
+
+cmd="${1:-}"
+[ -n "$cmd" ] || { usage; exit 1; }
+shift || true
+
+case "$cmd" in
+    doctor)
+        exec /bin/bash "$ROOT_DIR/doctor.sh" "$@"
+        ;;
+    create-tenant)
+        client_id="${1:-}"
+        [ -n "$client_id" ] || { usage; exit 1; }
+        shift || true
+        exec /bin/bash "$MONITOR_DIR/create_tenant.sh" "$client_id" --env-output "$@"
+        ;;
+    backup)
+        exec /bin/bash "$MONITOR_DIR/backup_project.sh" "$@"
+        ;;
+    status)
+        exec /bin/bash "$MONITOR_DIR/status_snapshot.sh" "$@"
+        ;;
+    generate-env)
+        exec /bin/bash "$MONITOR_DIR/generate_coolify_env.sh" "$@"
+        ;;
+    restore-tenant)
+        exec /bin/bash "$MONITOR_DIR/restore_tenant.sh" "$@"
+        ;;
+    delete-tenant)
+        exec /bin/bash "$MONITOR_DIR/delete_tenant.sh" "$@"
+        ;;
+    web-panel-install)
+        exec /bin/bash "$ROOT_DIR/setup_web_panel.sh" "$@"
+        ;;
+    rotate-token)
+        exec /bin/bash "$ROOT_DIR/rotate_web_token.sh" "$@"
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        echo "Comando no reconocido: $cmd"
+        usage
+        exit 1
+        ;;
+esac

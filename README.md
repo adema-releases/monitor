@@ -4,11 +4,58 @@ Repositorio oficial: https://github.com/adema-releases/monitor
 
 Este repositorio contiene scripts Bash para operar y monitorear multiples proyectos Django desplegados en contenedores.
 
+## ADEMA Node Lite: instalacion rapida
+
+Camino recomendado para una VM Ubuntu/Debian limpia:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adema-releases/monitor/main/bootstrap.sh | sudo bash
+```
+
+Alternativa segura y revisable:
+
+```bash
+sudo git clone https://github.com/adema-releases/monitor.git /opt/adema-node
+cd /opt/adema-node
+sudo bash bootstrap_node.sh
+```
+
+Despues del bootstrap:
+
+```bash
+sudo cat /etc/adema/node.env
+sudo adema-node doctor
+sudo adema-node create-tenant cliente001
+sudo adema-node generate-env cliente001
+sudo adema-node backup
+```
+
+El enfoque recomendado es **un PostgreSQL local por nodo**, Coolify local, backups por nodo y 10 a 15 tenants por VM. No requiere Kubernetes, Docker Swarm, DB central ni plataforma cloud compleja.
+
+Cada nodo tiene identidad unica en `/etc/adema/node.env`. Antes del primer backup verifica que no tenga valores demo/default y que `BACKUP_REMOTE` incluya el `ADEMA_NODE_ID`:
+
+```bash
+ADEMA_NODE_ID=gdc-node-001
+CLUSTER_ID=GDC-NODE-001
+PROJECT_CODE=gdc
+BACKUP_REMOTE=adema-crypt:backups/gdc-node-001
+```
+
+Evita valores peligrosos como `demo`, `test`, `default`, `node`, `local`, `CLUSTER-LOCAL` o `CLUSTER-DEMO-01`. Si clonaste una VM por error, cambia `ADEMA_NODE_ID`, `CLUSTER_ID`, dominios y `BACKUP_REMOTE`; luego regenera la identidad solo de forma explicita:
+
+```bash
+cd /opt/adema-node
+sudo bash bootstrap_node.sh --regenerate-node-identity
+sudo adema-node doctor
+```
+
+Guia de seguridad y hardening: [README_SEGURIDAD.md](README_SEGURIDAD.md).
+
 Identidad publica recomendada:
 
 - Producto: Adema Core
 - Repo publico: `adema-releases/monitor`
-- Carpeta operativa sugerida en servidor: `/home/adema/monitor`
+- Carpeta operativa sugerida en servidor: `/opt/adema-node`
 
 ## Estado Open Source
 
@@ -49,25 +96,16 @@ Para una VM Ubuntu 24.04 limpia, usa este flujo como camino feliz:
 1. Crear la VM y entrar por SSH.
 2. Actualizar sistema e instalar Docker, PostgreSQL, rclone, git, UFW y Fail2ban.
 3. Instalar Coolify y completar el onboarding con `This Machine`.
-4. Clonar este repo en `/home/adema/monitor`.
-5. Ejecutar el launcher, configurar variables demo/productivas y levantar el panel web.
-6. Validar snapshot, servicio web, backup y restore antes de considerar el nodo productivo.
+4. Instalar este repo en `/opt/adema-node` con `bootstrap.sh` o `bootstrap_node.sh`.
+5. Crear tenants con `adema-node` y pegar variables en Coolify.
+6. Validar doctor, login, DB, backup y restore antes de considerar el nodo productivo.
 
 Runbook completo: `docs/01-new-node.md`.
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-curl -fsSL https://get.docker.com | sh
-sudo apt install -y postgresql postgresql-contrib rclone openssl git ufw fail2ban
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
-
-sudo useradd -m -s /bin/bash adema || true
-sudo usermod -aG sudo adema
-sudo -u adema git clone https://github.com/adema-releases/monitor /home/adema/monitor
-cd /home/adema/monitor
-sudo find . -type f -name "*.sh" -exec chmod 755 {} \;
-sudo bash run_monitor.sh
-sudo bash setup_web_panel.sh
+curl -fsSL https://raw.githubusercontent.com/adema-releases/monitor/main/bootstrap.sh | sudo bash
+sudo adema-node doctor
+sudo adema-node create-tenant cliente001
 ```
 
 ## Quickstart del monitor
@@ -113,7 +151,9 @@ Una vez completada la instalacion y configurados los registros DNS en Cloudflare
 | Dominio                          | Destino       |
 |----------------------------------|---------------|
 | `https://deploy.tudominio.com`   | Coolify       |
-| `https://infra.tudominio.com`    | Adema Core    |
+| `https://monitor.tudominio.com`  | Adema Monitor |
+
+`infra.tudominio.com` queda como nombre legacy/deprecated. El proxy publico debe ser Coolify/Traefik, no Nginx del host.
 
 Para configurar el acceso por dominio:
 
@@ -121,7 +161,7 @@ Para configurar el acceso por dominio:
 sudo bash monitor/setup_domains.sh
 ```
 
-Para verificar el estado DNS, firewall y panel local:
+Para verificar el estado DNS, firewall, Coolify/Traefik y puertos internos:
 
 ```bash
 bash monitor/setup_domains.sh --check

@@ -1,0 +1,13 @@
+.git
+.venv
+.venv_web_panel
+__pycache__/
+*.pyc
+*.log
+.web_jobs/
+.tenant_trash.json
+.env
+*.env
+monitor/.monitor.env
+monitor/.monitor.secrets
+docs/index.html

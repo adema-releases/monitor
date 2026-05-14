@@ -1,0 +1,28 @@
+services:
+  adema-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adema-monitor:latest
+    restart: unless-stopped
+    environment:
+      ADEMA_WEB_TOKEN: ${ADEMA_WEB_TOKEN:?set_ADEMA_WEB_TOKEN}
+      ADEMA_WEB_HOST: 0.0.0.0
+      ADEMA_WEB_PORT: 5000
+      ADEMA_MONITOR_DIR: /app/monitor
+      MONITOR_ENV_FILE: /app/monitor/.monitor.env
+      PUBLIC_PROXY_MODE: coolify-traefik
+      BASE_DOMAIN: ${BASE_DOMAIN:-ademasistemas.com}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-ademasistemas.com}
+      WWW_DOMAIN: ${WWW_DOMAIN:-www.ademasistemas.com}
+      COOLIFY_DOMAIN: ${COOLIFY_DOMAIN:-deploy.ademasistemas.com}
+      MONITOR_DOMAIN: ${MONITOR_DOMAIN:-monitor.ademasistemas.com}
+      MONITOR_INTERNAL_PORT: 5000
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

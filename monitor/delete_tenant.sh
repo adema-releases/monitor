@@ -34,6 +34,7 @@ fi
 DB_NAME=$(db_name "$CLIENT_ID")
 DB_USER=$(db_user "$CLIENT_ID")
 PREFIX=$(volume_namespace "$CLIENT_ID")
+audit_event "delete_tenant" "$CLIENT_ID" "started" "db=$DB_NAME user=$DB_USER"
 
 echo "ADVERTENCIA: vas a eliminar permanentemente los datos de $CLIENT_ID en $PROJECT_CODE."
 if [ "$FORCE_DELETE" -eq 0 ]; then
@@ -41,6 +42,7 @@ if [ "$FORCE_DELETE" -eq 0 ]; then
 
     if [ "$confirm" != "y" ]; then
         echo "Operacion cancelada."
+        audit_event "delete_tenant" "$CLIENT_ID" "cancelled" "confirmation_failed"
         exit 1
     fi
 else
@@ -57,3 +59,4 @@ for folder in $VOLUME_FOLDERS; do
 done
 
 echo "Limpieza completa para $CLIENT_ID."
+audit_event "delete_tenant" "$CLIENT_ID" "success" "db=$DB_NAME user=$DB_USER"
