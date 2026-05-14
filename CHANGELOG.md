@@ -4,6 +4,19 @@ Todos los cambios relevantes de este proyecto se documentan aqui.
 
 ## Unreleased
 
+### Changed
+
+- `monitor/setup_domains.sh` ahora usa `coolify-traefik` como modo recomendado por defecto y deja `host-nginx` como legacy explicito.
+- El dominio principal del monitor pasa a `monitor.ademasistemas.com`; `infra.ademasistemas.com` queda legacy/deprecated.
+- El panel web y el diagnostico ya no consideran Nginx del host como estado valido cuando Coolify/Traefik maneja `80/443`.
+
+### Added
+
+- Artefactos para desplegar el monitor como app en Coolify: `Dockerfile`, `compose.yml`, `.dockerignore` y `requirements.txt`.
+- Nuevo mapa operativo `ecosystem/apps.yml` con dominios y bases de datos por app.
+- Nuevos scripts `scripts/diagnose_node.sh` y `scripts/disable_host_nginx.sh`.
+- Nueva documentacion de arquitectura, Cloudflare DNS y despliegue en Coolify.
+
 ## 1.2.0 - 2026-05-07
 
 ### Added

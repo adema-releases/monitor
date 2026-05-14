@@ -36,6 +36,11 @@ printf '{'
 printf '"timestamp":"%s",' "$(json_escape "$TIMESTAMP")"
 printf '"cluster_id":"%s",' "$(json_escape "$CLUSTER_ID")"
 printf '"project_code":"%s",' "$(json_escape "$PROJECT_CODE")"
+printf '"node_identity":{'
+printf '"adema_node_id":"%s",' "$(json_escape "${ADEMA_NODE_ID:-}")"
+printf '"adema_node_uuid":"%s",' "$(json_escape "${ADEMA_NODE_UUID:-}")"
+printf '"adema_node_name":"%s"' "$(json_escape "${ADEMA_NODE_NAME:-}")"
+printf '},'
 
 printf '"host":{'
 printf '"hostname":"%s",' "$(json_escape "$HOSTNAME_VALUE")"

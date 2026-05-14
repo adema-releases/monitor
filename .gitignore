@@ -1,6 +1,10 @@
 # Local secrets and node-specific config
 monitor/.monitor.secrets
 monitor/.monitor.env
+.env
+*.env
+!*.env.example
+!monitor/*.env.example
 
 # Web panel runtime artifacts
 .web_jobs/

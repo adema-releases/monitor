@@ -4,6 +4,13 @@ set -euo pipefail
 ENV_FILE="${ADEMA_ENV_FILE:-/etc/adema/web_panel.env}"
 SERVICE_NAME="${ADEMA_WEB_SERVICE_NAME:-adema-web-panel.service}"
 NEW_TOKEN="${1:-}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -f "$ROOT_DIR/monitor/lib/common.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$ROOT_DIR/monitor/lib/common.sh"
+    load_monitor_env || true
+fi
 
 if [ "$EUID" -ne 0 ]; then
     echo "Error: ejecuta con sudo para actualizar $ENV_FILE y reiniciar $SERVICE_NAME."
@@ -63,6 +70,10 @@ if ! systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "Error: $SERVICE_NAME no quedo activo despues del reinicio."
     echo "Puedes restaurar el backup con: cp -a $BACKUP_FILE $ENV_FILE"
     exit 1
+fi
+
+if declare -F audit_event >/dev/null 2>&1; then
+    audit_event "rotate_token" "" "success" "service=$SERVICE_NAME env_file=$ENV_FILE"
 fi
 
 WEB_HOST="$(grep '^ADEMA_WEB_HOST=' "$ENV_FILE" | cut -d'=' -f2- || true)"

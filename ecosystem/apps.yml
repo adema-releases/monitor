@@ -1,0 +1,37 @@
+apps:
+  - name: adema-web
+    domain: ademasistemas.com
+    aliases:
+      - www.ademasistemas.com
+    type: institutional-web
+    database: db_adema_web
+
+  - name: adema-clientes
+    domain: clientes.ademasistemas.com
+    type: django
+    database: db_adema_clientes
+
+  - name: adema-monitor
+    domain: monitor.ademasistemas.com
+    type: monitor
+    database: db_adema_monitor
+
+  - name: adema-api
+    domain: api.ademasistemas.com
+    type: api
+    database: db_adema_api
+
+  - name: gestion-creditos
+    domain: creditos.ademasistemas.com
+    type: django-product
+    database: db_gestion_creditos
+
+  - name: adema-stock
+    domain: stock.ademasistemas.com
+    type: django-product
+    database: db_adema_stock
+
+  - name: academia-adema
+    domain: academy.ademasistemas.com
+    type: django-or-lms
+    database: db_academia_adema

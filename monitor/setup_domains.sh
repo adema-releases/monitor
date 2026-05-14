@@ -1,28 +1,21 @@
 #!/bin/bash
 set -euo pipefail
-# Adema Core - Configuracion de dominios y proxy reverso
+# Adema Core - DNS/proxy bootstrap for Coolify/Traefik nodes
 # Repo oficial: https://github.com/adema-releases/monitor
 #
-# Uso:
-#   bash monitor/setup_domains.sh                  # asistente interactivo completo
-#   bash monitor/setup_domains.sh --check          # solo verificar, sin modificar
-#   bash monitor/setup_domains.sh --check --json   # verificar y devolver JSON (para API)
+# Responsabilidades separadas:
+#   1) Bootstrap/diagnostico del nodo: DNS, firewall, Docker, Coolify y puertos.
+#   2) Monitor como app: se publica desde Coolify en monitor.<dominio>, sin manejar 80/443.
 #
-# Variables de entorno soportadas:
-#   ADEMA_BASE_DOMAIN     - Dominio base (ej: ademasistemas.com)
-#   ADEMA_INFRA_DOMAIN    - Subdominio panel (default: infra.$ADEMA_BASE_DOMAIN)
-#   ADEMA_DEPLOY_DOMAIN   - Subdominio Coolify (default: deploy.$ADEMA_BASE_DOMAIN)
-#   ADEMA_PANEL_PORT      - Puerto del panel local (default: 5000)
-#   ADEMA_PANEL_BIND      - Bind del panel local (default: 127.0.0.1)
-#   ADEMA_DOMAINS_ENV_FILE - Ruta al archivo de entorno de dominios
-#                            (default: /etc/adema/domains.env)
+# Uso:
+#   bash monitor/setup_domains.sh
+#   bash monitor/setup_domains.sh --check
+#   bash monitor/setup_domains.sh --check --json
+#   bash monitor/setup_domains.sh --proxy-mode host-nginx   # legacy, requiere confirmacion
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="$SCRIPT_DIR/lib"
-
 DOMAINS_ENV_FILE="${ADEMA_DOMAINS_ENV_FILE:-/etc/adema/domains.env}"
 
-# ── Colores ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -30,74 +23,114 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# ── Flags ─────────────────────────────────────────────────────────────────────
 MODE_CHECK=0
 MODE_JSON=0
-for _arg in "$@"; do
-    case "$_arg" in
-        --check) MODE_CHECK=1 ;;
-        --json)  MODE_JSON=1  ;;
-    esac
-done
-[ "$MODE_JSON" -eq 1 ] && MODE_CHECK=1
+PROXY_MODE_REQUESTED="${PUBLIC_PROXY_MODE:-coolify-traefik}"
 
-# ── Helpers de salida (silencios en modo JSON) ────────────────────────────────
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --check) MODE_CHECK=1 ;;
+        --json) MODE_JSON=1; MODE_CHECK=1 ;;
+        --proxy-mode)
+            shift
+            PROXY_MODE_REQUESTED="${1:-}"
+            ;;
+        --proxy-mode=*) PROXY_MODE_REQUESTED="${1#*=}" ;;
+        --host-nginx|--legacy-host-nginx) PROXY_MODE_REQUESTED="host-nginx" ;;
+        -h|--help)
+            cat <<HELP
+Adema Core - setup de dominios
+
+Opciones:
+  --check                 Solo diagnostico, sin cambios
+  --json                  Salida JSON para API
+  --proxy-mode MODE       coolify-traefik (default) o host-nginx (legacy)
+  --host-nginx            Alias legacy para --proxy-mode host-nginx
+
+El modo recomendado es coolify-traefik. No instala Nginx ni ejecuta certbot.
+HELP
+            exit 0
+            ;;
+        *)
+            echo "Argumento desconocido: $1" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
 _say()    { [ "$MODE_JSON" -eq 0 ] && echo -e "$*" >&2 || true; }
 log()     { _say "${BOLD}[INFO]${RESET}  $*"; }
 ok()      { _say "${GREEN}[OK]${RESET}    $*"; }
 warn()    { _say "${YELLOW}[WARN]${RESET}  $*"; }
+fail()    { _say "${RED}[FAIL]${RESET}  $*"; }
 err_msg() { _say "${RED}[ERROR]${RESET} $*"; }
-title()   { _say "\n${CYAN}${BOLD}━━━  $*  ━━━${RESET}"; }
-hr()      { _say "${CYAN}────────────────────────────────────────────────────${RESET}"; }
+title()   { _say "\n${CYAN}${BOLD}...  $*  ...${RESET}"; }
+hr()      { _say "${CYAN}----------------------------------------------------${RESET}"; }
 sep()     { _say ""; }
 
-# ── Cargar librería común si existe ──────────────────────────────────────────
-if [ -f "$LIB_DIR/common.sh" ]; then
-    # shellcheck source=lib/common.sh
-    source "$LIB_DIR/common.sh"
-fi
-
-# ── Cargar archivo de entorno de dominios si existe ───────────────────────────
 if [ -f "$DOMAINS_ENV_FILE" ]; then
     # shellcheck source=/dev/null
     source "$DOMAINS_ENV_FILE"
 fi
 
-# ── Variables con defaults ────────────────────────────────────────────────────
-ADEMA_BASE_DOMAIN="${ADEMA_BASE_DOMAIN:-}"
-ADEMA_INFRA_DOMAIN="${ADEMA_INFRA_DOMAIN:-}"
-ADEMA_DEPLOY_DOMAIN="${ADEMA_DEPLOY_DOMAIN:-}"
-ADEMA_PANEL_PORT="${ADEMA_PANEL_PORT:-5000}"
-ADEMA_PANEL_BIND="${ADEMA_PANEL_BIND:-127.0.0.1}"
-ADEMA_COOLIFY_PORT="${ADEMA_COOLIFY_PORT:-8000}"
+BASE_DOMAIN="${BASE_DOMAIN:-${ADEMA_BASE_DOMAIN:-}}"
+ROOT_DOMAIN="${ROOT_DOMAIN:-${BASE_DOMAIN:-}}"
+WWW_DOMAIN="${WWW_DOMAIN:-${BASE_DOMAIN:+www.${BASE_DOMAIN}}}"
+COOLIFY_DOMAIN="${COOLIFY_DOMAIN:-${ADEMA_DEPLOY_DOMAIN:-${BASE_DOMAIN:+deploy.${BASE_DOMAIN}}}}"
+MONITOR_DOMAIN="${MONITOR_DOMAIN:-${ADEMA_MONITOR_DOMAIN:-${ADEMA_INFRA_DOMAIN:-${BASE_DOMAIN:+monitor.${BASE_DOMAIN}}}}}"
+CLIENTES_DOMAIN="${CLIENTES_DOMAIN:-${BASE_DOMAIN:+clientes.${BASE_DOMAIN}}}"
+API_DOMAIN="${API_DOMAIN:-${BASE_DOMAIN:+api.${BASE_DOMAIN}}}"
+CREDITOS_DOMAIN="${CREDITOS_DOMAIN:-${BASE_DOMAIN:+creditos.${BASE_DOMAIN}}}"
+STOCK_DOMAIN="${STOCK_DOMAIN:-${BASE_DOMAIN:+stock.${BASE_DOMAIN}}}"
+ACADEMY_DOMAIN="${ACADEMY_DOMAIN:-${BASE_DOMAIN:+academy.${BASE_DOMAIN}}}"
+MONITOR_INTERNAL_PORT="${MONITOR_INTERNAL_PORT:-${ADEMA_PANEL_PORT:-5000}}"
+MONITOR_BIND="${MONITOR_BIND:-${ADEMA_PANEL_BIND:-127.0.0.1}}"
+PUBLIC_PROXY_MODE="${PROXY_MODE_REQUESTED:-coolify-traefik}"
 
-# ── Leer input interactivo ────────────────────────────────────────────────────
+# Aliases legacy para integraciones existentes.
+ADEMA_BASE_DOMAIN="${ADEMA_BASE_DOMAIN:-$BASE_DOMAIN}"
+ADEMA_DEPLOY_DOMAIN="${ADEMA_DEPLOY_DOMAIN:-$COOLIFY_DOMAIN}"
+ADEMA_INFRA_DOMAIN="${ADEMA_INFRA_DOMAIN:-$MONITOR_DOMAIN}"
+ADEMA_PANEL_PORT="${ADEMA_PANEL_PORT:-$MONITOR_INTERNAL_PORT}"
+ADEMA_PANEL_BIND="${ADEMA_PANEL_BIND:-$MONITOR_BIND}"
+
+ALL_DOMAINS=(
+    "$ROOT_DOMAIN"
+    "$WWW_DOMAIN"
+    "$COOLIFY_DOMAIN"
+    "$MONITOR_DOMAIN"
+    "$CLIENTES_DOMAIN"
+    "$API_DOMAIN"
+    "$CREDITOS_DOMAIN"
+    "$STOCK_DOMAIN"
+    "$ACADEMY_DOMAIN"
+)
+
 prompt_if_empty() {
-    local -n _var_ref=$1
+    local -n var_ref=$1
     local prompt_text="$2"
     local default_val="${3:-}"
 
-    if [ -n "${_var_ref}" ]; then
+    if [ -n "${var_ref:-}" ]; then
         return
     fi
-
     if [ "$MODE_CHECK" -eq 1 ]; then
-        err_msg "Variable $1 no definida. Define ADEMA_BASE_DOMAIN antes de correr con --check."
+        err_msg "Variable $1 no definida. Define BASE_DOMAIN o crea $DOMAINS_ENV_FILE."
         exit 1
     fi
 
     if [ -n "$default_val" ]; then
         printf "%b" "${BOLD}${prompt_text}${RESET} [${CYAN}${default_val}${RESET}]: " >&2
-        read -r _input </dev/tty
-        _var_ref="${_input:-$default_val}"
+        read -r input </dev/tty
+        var_ref="${input:-$default_val}"
     else
         printf "%b" "${BOLD}${prompt_text}${RESET}: " >&2
-        read -r _input </dev/tty
-        _var_ref="$_input"
+        read -r input </dev/tty
+        var_ref="$input"
     fi
 }
 
-# ── Detectar IP pública ───────────────────────────────────────────────────────
 detect_public_ip() {
     local ip=""
     ip=$(curl -4 -s --max-time 6 ifconfig.me 2>/dev/null || true)
@@ -106,12 +139,10 @@ detect_public_ip() {
     echo "${ip:-}"
 }
 
-# ── Resolver dominio DNS ──────────────────────────────────────────────────────
 resolve_domain() {
     local domain="${1:-}"
     local resolved=""
-
-    if [ -z "$domain" ]; then echo ""; return; fi
+    [ -z "$domain" ] && { echo ""; return; }
 
     if command -v dig >/dev/null 2>&1; then
         resolved=$(dig +short "$domain" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
@@ -120,11 +151,9 @@ resolve_domain() {
     elif command -v nslookup >/dev/null 2>&1; then
         resolved=$(nslookup "$domain" 2>/dev/null | awk '/^Address:/ && !/127\.0\.0\.1/ {print $2; exit}' || true)
     fi
-
     echo "${resolved:-}"
 }
 
-# ── Estado de puerto en UFW ───────────────────────────────────────────────────
 ufw_port_status() {
     local port="$1"
     if ! command -v ufw >/dev/null 2>&1; then
@@ -134,685 +163,592 @@ ufw_port_status() {
 
     local status
     status=$(ufw status 2>/dev/null || true)
-
-    if echo "$status" | grep -qi "^Status: inactive"; then
+    if echo "$status" | grep -qi '^Status: inactive'; then
         echo "ufw_inactive"
         return
     fi
-
-    # Buscar regla exacta: puerto/tcp o solo puerto como ALLOW o ALLOW IN
-    if echo "$status" | grep -qE "^${port}(/tcp)?\s+(ALLOW|ALLOW IN)"; then
+    if echo "$status" | grep -qE "^${port}(/tcp)?[[:space:]]+(ALLOW|ALLOW IN)"; then
         echo "open"
         return
     fi
-
     echo "closed"
 }
 
-# ── Verificar panel local ─────────────────────────────────────────────────────
-check_panel_local() {
-    local port="${1:-5000}"
-    local bind="${2:-127.0.0.1}"
-    local url="http://${bind}:${port}/"
-    local http_code
-
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 6 "$url" 2>/dev/null || echo "000")
-
-    if [ "$http_code" = "000" ]; then
-        echo "down"
-    else
-        echo "up"
+port_listener_output() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tulpn 2>/dev/null | grep -E ":${port}\b" || true
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tulpn 2>/dev/null | grep -E ":${port}\b" || true
     fi
 }
 
-# ── Detectar proxy en 80/443 ─────────────────────────────────────────────────
 detect_proxy_on_ports() {
-    local ports_output=""
+    local output docker_output combined
+    output="$(port_listener_output 80; port_listener_output 443)"
+    docker_output="$(docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null || true)"
+    combined="$output
+$docker_output"
 
-    if command -v ss >/dev/null 2>&1; then
-        ports_output=$(ss -tulpn 2>/dev/null | grep -E ':(80|443)\b' || true)
-    elif command -v netstat >/dev/null 2>&1; then
-        ports_output=$(netstat -tulpn 2>/dev/null | grep -E ':(80|443)\b' || true)
-    fi
-
-    if echo "$ports_output" | grep -qiE "traefik|coolify"; then
-        echo "coolify"
-    elif echo "$ports_output" | grep -qi "caddy"; then
+    if echo "$combined" | grep -qiE 'traefik|coolify-proxy|coolify'; then
+        echo "coolify-traefik"
+    elif echo "$combined" | grep -qi 'caddy'; then
         echo "caddy"
-    elif echo "$ports_output" | grep -qi "nginx"; then
+    elif echo "$output" | grep -qi 'nginx'; then
         echo "nginx"
-    elif [ -n "$ports_output" ]; then
+    elif [ -n "$output" ]; then
         echo "other"
     else
         echo "free"
     fi
 }
 
-# ── Generar config Nginx ──────────────────────────────────────────────────────
-# Params: domain port bind [conf_name] [ws_upgrade]
-#   conf_name:  nombre base del archivo en sites-available (sin .conf), default: adema-core
-#   ws_upgrade: 1 para WebSocket/Coolify ("upgrade"), 0 para HTTP normal (panel Flask)
-generate_nginx_config() {
-    local domain="$1"
-    local port="$2"
-    local bind="$3"
-    local conf_name="${4:-adema-core}"
-    local ws_upgrade="${5:-0}"
-    local conf_path="/etc/nginx/sites-available/${conf_name}.conf"
-    local enabled_path="/etc/nginx/sites-enabled/${conf_name}.conf"
-
-    local connection_header read_timeout
-    if [ "$ws_upgrade" = "1" ]; then
-        connection_header='"upgrade"'
-        read_timeout=120
+docker_status() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "missing"
+        return
+    fi
+    if docker info >/dev/null 2>&1; then
+        echo "running"
     else
-        connection_header="keep-alive"
-        read_timeout=90
+        echo "installed_not_running"
+    fi
+}
+
+coolify_status() {
+    local containers
+    containers=$(docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null | grep -iE 'coolify|traefik' || true)
+    if [ -n "$containers" ]; then
+        echo "running"
+        return
+    fi
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet coolify 2>/dev/null; then
+        echo "running"
+        return
+    fi
+    echo "not_detected"
+}
+
+host_nginx_status() {
+    if ! command -v nginx >/dev/null 2>&1; then
+        echo "not_installed"
+        return
+    fi
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx 2>/dev/null; then
+        echo "active"
+        return
+    fi
+    echo "installed_inactive"
+}
+
+port_public_status() {
+    local port="$1"
+    local output
+    output=$(port_listener_output "$port")
+    if [ -z "$output" ]; then
+        echo "closed"
+    elif echo "$output" | grep -qE '(^|[[:space:]])(0\.0\.0\.0|\[::\]|\*)[:.]'; then
+        echo "public"
+    else
+        echo "local_or_internal"
+    fi
+}
+
+check_monitor_local() {
+    local bind="${1:-127.0.0.1}"
+    local port="${2:-5000}"
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${bind}:${port}/healthz" 2>/dev/null || echo "000")
+    if [ "$code" = "200" ]; then
+        echo "up"
+    else
+        code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://${bind}:${port}/" 2>/dev/null || echo "000")
+        [ "$code" = "000" ] && echo "down" || echo "up"
+    fi
+}
+
+ensure_ufw_rules() {
+    if [ "$EUID" -ne 0 ]; then
+        warn "No se aplican reglas UFW porque no estas ejecutando como root."
+        echo "  sudo ufw allow 22/tcp comment 'SSH'" >&2
+        echo "  sudo ufw allow 80/tcp comment 'HTTP for Coolify Traefik'" >&2
+        echo "  sudo ufw allow 443/tcp comment 'HTTPS for Coolify Traefik'" >&2
+        return
+    fi
+    if ! command -v ufw >/dev/null 2>&1; then
+        warn "UFW no esta instalado. Instala ufw o aplica reglas equivalentes en tu firewall."
+        return
     fi
 
-    local nginx_content
-    nginx_content="# Adema Core - Proxy reverso
-# Generado por setup_domains.sh
-# https://github.com/adema-releases/monitor
+    ufw allow 22/tcp comment 'SSH' >/dev/null || true
+    ufw allow 80/tcp comment 'HTTP for Coolify Traefik' >/dev/null || true
+    ufw allow 443/tcp comment 'HTTPS for Coolify Traefik' >/dev/null || true
+    ok "UFW permite 22/tcp, 80/tcp y 443/tcp."
 
+    if ufw status 2>/dev/null | grep -qi '^Status: inactive'; then
+        warn "UFW esta inactivo."
+        printf "%b" "  Activar UFW ahora? [s/N]: " >&2
+        read -r enable_ufw </dev/tty
+        if [[ "${enable_ufw,,}" = "s" ]]; then
+            ufw --force enable >/dev/null
+            ok "UFW activado."
+        else
+            warn "UFW queda inactivo; verifica firewall externo antes de produccion."
+        fi
+    fi
+}
+
+print_cloudflare_instructions() {
+    local server_ip="$1"
+
+    title "Cloudflare DNS"
+    hr
+    log "Cloudflare debe resolver DNS solamente; Coolify/Traefik enruta HTTP/HTTPS."
+    sep
+    echo "  A      @      ${server_ip:-IP_DEL_NODO}       DNS only" >&2
+    echo "  A      *      ${server_ip:-IP_DEL_NODO}       DNS only" >&2
+    echo "  CNAME  www    ${ROOT_DOMAIN:-ademasistemas.com}  DNS only" >&2
+    sep
+    warn "No tocar MX/TXT/DKIM/SPF/DMARC/Brevo/Zoho existentes."
+    warn "Durante emision inicial de SSL, usar DNS only. Luego evaluar proxied si no rompe ACME/websockets."
+    hr
+}
+
+print_coolify_instructions() {
+    title "Coolify / Traefik"
+    hr
+    log "Crear recursos separados en Coolify y asignar estos dominios:"
+    echo "  adema-web          -> https://${ROOT_DOMAIN}" >&2
+    echo "  adema-web alias    -> https://${WWW_DOMAIN}" >&2
+    echo "  coolify panel      -> https://${COOLIFY_DOMAIN}" >&2
+    echo "  adema-monitor      -> https://${MONITOR_DOMAIN}  (puerto interno ${MONITOR_INTERNAL_PORT})" >&2
+    echo "  adema-clientes     -> https://${CLIENTES_DOMAIN}" >&2
+    echo "  adema-api          -> https://${API_DOMAIN}" >&2
+    echo "  gestion-creditos   -> https://${CREDITOS_DOMAIN}" >&2
+    echo "  adema-stock        -> https://${STOCK_DOMAIN}" >&2
+    echo "  academia-adema     -> https://${ACADEMY_DOMAIN}" >&2
+    sep
+    log "Cada app debe tener DB/servicio Postgres propio y credenciales propias."
+    warn "No publiques el puerto ${MONITOR_INTERNAL_PORT} como puerto host; Coolify debe enrutarlo por Traefik."
+    hr
+}
+
+write_domains_env() {
+    if [ "$EUID" -ne 0 ]; then
+        warn "No se guarda $DOMAINS_ENV_FILE porque no estas ejecutando como root."
+        return
+    fi
+
+    printf "%b" "  Guardar configuracion en ${DOMAINS_ENV_FILE}? [S/n]: " >&2
+    read -r save_env </dev/tty
+    if [[ "${save_env,,}" = "n" ]]; then
+        return
+    fi
+
+    mkdir -p "$(dirname "$DOMAINS_ENV_FILE")"
+    cat > "$DOMAINS_ENV_FILE" <<ENVEOF
+# Adema Core - Dominios del nodo
+# Generado por setup_domains.sh
+BASE_DOMAIN=${BASE_DOMAIN}
+ROOT_DOMAIN=${ROOT_DOMAIN}
+WWW_DOMAIN=${WWW_DOMAIN}
+COOLIFY_DOMAIN=${COOLIFY_DOMAIN}
+MONITOR_DOMAIN=${MONITOR_DOMAIN}
+CLIENTES_DOMAIN=${CLIENTES_DOMAIN}
+API_DOMAIN=${API_DOMAIN}
+CREDITOS_DOMAIN=${CREDITOS_DOMAIN}
+STOCK_DOMAIN=${STOCK_DOMAIN}
+ACADEMY_DOMAIN=${ACADEMY_DOMAIN}
+MONITOR_INTERNAL_PORT=${MONITOR_INTERNAL_PORT}
+PUBLIC_PROXY_MODE=coolify-traefik
+
+# Aliases legacy/deprecated para compatibilidad
+ADEMA_BASE_DOMAIN=${BASE_DOMAIN}
+ADEMA_DEPLOY_DOMAIN=${COOLIFY_DOMAIN}
+ADEMA_INFRA_DOMAIN=${MONITOR_DOMAIN}
+ADEMA_PANEL_PORT=${MONITOR_INTERNAL_PORT}
+ADEMA_PANEL_BIND=127.0.0.1
+ENVEOF
+    chmod 640 "$DOMAINS_ENV_FILE"
+    ok "Configuracion guardada en $DOMAINS_ENV_FILE"
+}
+
+json_bool() {
+    [ "${1:-false}" = "true" ] && echo "true" || echo "false"
+}
+
+bool_expr() {
+    if eval "$1"; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+run_checks() {
+    local server_ip http_status https_status ssh_status proxy_detected docker_state coolify_state nginx_state
+    local monitor_port_state postgres_state redis_state monitor_local_status
+    local dns_count=0 dns_direct_count=0 dns_proxy_count=0 dns_fail_count=0 wildcard_ok="false"
+    local monitor_resolved deploy_resolved root_resolved www_resolved
+
+    server_ip=$(detect_public_ip)
+    http_status=$(ufw_port_status 80)
+    https_status=$(ufw_port_status 443)
+    ssh_status=$(ufw_port_status 22)
+    proxy_detected=$(detect_proxy_on_ports)
+    docker_state=$(docker_status)
+    coolify_state=$(coolify_status)
+    nginx_state=$(host_nginx_status)
+    monitor_port_state=$(port_public_status "$MONITOR_INTERNAL_PORT")
+    postgres_state=$(port_public_status 5432)
+    redis_state=$(port_public_status 6379)
+    monitor_local_status=$(check_monitor_local "$MONITOR_BIND" "$MONITOR_INTERNAL_PORT")
+
+    root_resolved=$(resolve_domain "$ROOT_DOMAIN")
+    www_resolved=$(resolve_domain "$WWW_DOMAIN")
+    deploy_resolved=$(resolve_domain "$COOLIFY_DOMAIN")
+    monitor_resolved=$(resolve_domain "$MONITOR_DOMAIN")
+
+    local domain resolved
+    local check_domains=(
+        "$ROOT_DOMAIN"
+        "$WWW_DOMAIN"
+        "$COOLIFY_DOMAIN"
+        "$MONITOR_DOMAIN"
+        "$CLIENTES_DOMAIN"
+        "$API_DOMAIN"
+        "$CREDITOS_DOMAIN"
+        "$STOCK_DOMAIN"
+        "$ACADEMY_DOMAIN"
+    )
+    for domain in "${check_domains[@]}"; do
+        [ -n "$domain" ] || continue
+        dns_count=$((dns_count + 1))
+        resolved=$(resolve_domain "$domain")
+        if [ -z "$resolved" ]; then
+            dns_fail_count=$((dns_fail_count + 1))
+        elif [ -n "$server_ip" ] && [ "$resolved" = "$server_ip" ]; then
+            dns_direct_count=$((dns_direct_count + 1))
+        else
+            dns_proxy_count=$((dns_proxy_count + 1))
+        fi
+    done
+
+    if [ -n "$root_resolved" ] && [ -n "$monitor_resolved" ] && { [ "$root_resolved" = "$monitor_resolved" ] || [ "$dns_proxy_count" -gt 0 ]; }; then
+        wildcard_ok="true"
+    fi
+
+    local http_open="false" https_open="false" ssh_open="false" proxy_ok="false" nginx_conflict="false"
+    local monitor_port_public="false" postgres_public="false" redis_public="false" docker_ok="false" coolify_ok="false"
+    local monitor_dns_ok="false" deploy_dns_ok="false" root_dns_ok="false" warning_count=0 fail_count=0 overall_ok="true"
+
+    [ "$http_status" = "open" ] && http_open="true"
+    [ "$https_status" = "open" ] && https_open="true"
+    [ "$ssh_status" = "open" ] && ssh_open="true"
+    [ "$docker_state" = "running" ] && docker_ok="true"
+    [ "$coolify_state" = "running" ] && coolify_ok="true"
+    [ "$proxy_detected" = "coolify-traefik" ] && proxy_ok="true"
+    [ "$nginx_state" = "active" ] && nginx_conflict="true"
+    [ "$monitor_port_state" = "public" ] && monitor_port_public="true"
+    [ "$postgres_state" = "public" ] && postgres_public="true"
+    [ "$redis_state" = "public" ] && redis_public="true"
+    [ -n "$monitor_resolved" ] && monitor_dns_ok="true"
+    [ -n "$deploy_resolved" ] && deploy_dns_ok="true"
+    [ -n "$root_resolved" ] && root_dns_ok="true"
+
+    [ "$http_open" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$https_open" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$proxy_ok" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$nginx_conflict" = "false" ] || fail_count=$((fail_count + 1))
+    [ "$monitor_port_public" = "false" ] || fail_count=$((fail_count + 1))
+    [ "$postgres_public" = "false" ] || fail_count=$((fail_count + 1))
+    [ "$redis_public" = "false" ] || fail_count=$((fail_count + 1))
+    [ "$docker_ok" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$coolify_ok" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$monitor_dns_ok" = "true" ] || fail_count=$((fail_count + 1))
+    [ "$deploy_dns_ok" = "true" ] || fail_count=$((fail_count + 1))
+
+    [ "$root_dns_ok" = "true" ] || warning_count=$((warning_count + 1))
+    [ "$dns_proxy_count" -eq 0 ] || warning_count=$((warning_count + 1))
+    [ "$monitor_local_status" = "up" ] || warning_count=$((warning_count + 1))
+    [ "$ssh_open" = "true" ] || warning_count=$((warning_count + 1))
+
+    [ "$fail_count" -eq 0 ] || overall_ok="false"
+
+    local deploy_points monitor_points deploy_proxy monitor_proxy panel_responding
+    deploy_points=$(bool_expr '[ -n "$server_ip" ] && [ "$deploy_resolved" = "$server_ip" ]')
+    monitor_points=$(bool_expr '[ -n "$server_ip" ] && [ "$monitor_resolved" = "$server_ip" ]')
+    deploy_proxy=$(bool_expr '[ -n "$deploy_resolved" ] && { [ -z "$server_ip" ] || [ "$deploy_resolved" != "$server_ip" ]; }')
+    monitor_proxy=$(bool_expr '[ -n "$monitor_resolved" ] && { [ -z "$server_ip" ] || [ "$monitor_resolved" != "$server_ip" ]; }')
+    panel_responding=$(bool_expr '[ "$monitor_local_status" = "up" ]')
+
+    if [ "$MODE_JSON" -eq 1 ]; then
+        cat <<JSON
+{
+  "ok": $(json_bool "$overall_ok"),
+  "public_proxy_mode": "coolify-traefik",
+  "base_domain": "${BASE_DOMAIN}",
+  "root_domain": "${ROOT_DOMAIN}",
+  "www_domain": "${WWW_DOMAIN}",
+  "deploy_domain": "${COOLIFY_DOMAIN}",
+  "monitor_domain": "${MONITOR_DOMAIN}",
+  "infra_domain": "${MONITOR_DOMAIN}",
+  "server_ip": "${server_ip}",
+  "dns": {
+    "root_resolved": "${root_resolved}",
+    "www_resolved": "${www_resolved}",
+    "deploy_resolved": "${deploy_resolved}",
+    "monitor_resolved": "${monitor_resolved}",
+    "root_resolves": $(json_bool "$root_dns_ok"),
+    "deploy_resolves": $(json_bool "$deploy_dns_ok"),
+    "monitor_resolves": $(json_bool "$monitor_dns_ok"),
+    "deploy_points_to_server": $(json_bool "$deploy_points"),
+    "monitor_points_to_server": $(json_bool "$monitor_points"),
+    "infra_points_to_server": $(json_bool "$monitor_points"),
+    "deploy_via_proxy": $(json_bool "$deploy_proxy"),
+    "monitor_via_proxy": $(json_bool "$monitor_proxy"),
+    "infra_via_proxy": $(json_bool "$monitor_proxy"),
+    "wildcard_likely_ok": $(json_bool "$wildcard_ok"),
+    "checked_count": ${dns_count},
+    "direct_count": ${dns_direct_count},
+    "proxied_or_cdn_count": ${dns_proxy_count},
+    "failed_count": ${dns_fail_count}
+  },
+  "firewall": {
+    "ufw_ssh": "${ssh_status}",
+    "ufw_http": "${http_status}",
+    "ufw_https": "${https_status}",
+    "ssh_open": $(json_bool "$ssh_open"),
+    "http_open": $(json_bool "$http_open"),
+    "https_open": $(json_bool "$https_open"),
+    "panel_port_public_required": false
+  },
+  "ports": {
+    "monitor_internal_port": "${MONITOR_INTERNAL_PORT}",
+    "monitor_public": $(json_bool "$monitor_port_public"),
+    "postgres_public": $(json_bool "$postgres_public"),
+    "redis_public": $(json_bool "$redis_public")
+  },
+  "services": {
+    "docker": "${docker_state}",
+    "coolify": "${coolify_state}",
+    "host_nginx": "${nginx_state}"
+  },
+  "panel": {
+    "local_url": "http://${MONITOR_BIND}:${MONITOR_INTERNAL_PORT}/",
+    "responding": $(json_bool "$panel_responding")
+  },
+  "proxy": {
+    "detected": "${proxy_detected}",
+    "mode": "coolify-traefik",
+    "ok": $(json_bool "$proxy_ok"),
+    "nginx_conflict": $(json_bool "$nginx_conflict")
+  },
+  "summary": {
+    "warnings": ${warning_count},
+    "failures": ${fail_count}
+  }
+}
+JSON
+        return
+    fi
+
+    title "IP publica"
+    hr
+    [ -n "$server_ip" ] && ok "IP detectada: $server_ip" || warn "No se pudo detectar la IP publica."
+
+    title "DNS Cloudflare"
+    hr
+    [ "$wildcard_ok" = "true" ] && ok "DNS wildcard configurado o cubierto por CDN" || warn "No se pudo confirmar wildcard A * -> nodo."
+    [ "$root_dns_ok" = "true" ] && ok "$ROOT_DOMAIN -> $root_resolved" || warn "$ROOT_DOMAIN sin resolver"
+    [ "$deploy_dns_ok" = "true" ] && ok "$COOLIFY_DOMAIN -> $deploy_resolved" || fail "$COOLIFY_DOMAIN sin resolver"
+    [ "$monitor_dns_ok" = "true" ] && ok "$MONITOR_DOMAIN -> $monitor_resolved" || fail "$MONITOR_DOMAIN sin resolver"
+    [ "$dns_proxy_count" -eq 0 ] || warn "Cloudflare parece proxied/CDN en algun dominio. Recomendado DNS only durante SSL inicial."
+
+    title "Firewall y puertos"
+    hr
+    [ "$ssh_open" = "true" ] && ok "UFW permite SSH" || warn "UFW no muestra 22/tcp abierto. Verifica acceso SSH."
+    [ "$http_open" = "true" ] && ok "UFW permite 80/tcp" || fail "UFW 80/tcp cerrado"
+    [ "$https_open" = "true" ] && ok "UFW permite 443/tcp" || fail "UFW 443/tcp cerrado"
+    [ "$monitor_port_public" = "false" ] && ok "Puerto ${MONITOR_INTERNAL_PORT} no esta abierto publicamente" || fail "Puerto ${MONITOR_INTERNAL_PORT} expuesto publicamente"
+    [ "$postgres_public" = "false" ] && ok "Postgres no esta expuesto publicamente" || fail "Postgres 5432 expuesto publicamente"
+    [ "$redis_public" = "false" ] && ok "Redis no esta expuesto publicamente" || fail "Redis 6379 expuesto publicamente"
+
+    title "Docker / Coolify / Traefik"
+    hr
+    [ "$docker_ok" = "true" ] && ok "Docker activo" || fail "Docker no esta activo"
+    [ "$coolify_ok" = "true" ] && ok "Coolify detectado" || fail "Coolify no detectado"
+    case "$proxy_detected" in
+        coolify-traefik) ok "Coolify/Traefik maneja 80/443" ;;
+        nginx) fail "Nginx del host activo compitiendo con Traefik" ;;
+        free) fail "80/443 libres: Coolify/Traefik todavia no esta escuchando" ;;
+        other|caddy) fail "Otro proxy usa 80/443: $proxy_detected" ;;
+    esac
+    [ "$nginx_conflict" = "false" ] && ok "Nginx host no esta activo" || fail "Nginx host activo"
+
+    title "Monitor"
+    hr
+    [ "$monitor_local_status" = "up" ] && ok "Monitor responde localmente" || warn "Monitor local no responde; si se despliega por Coolify, revisar healthcheck del recurso."
+    ok "Dominio publico objetivo: https://${MONITOR_DOMAIN}"
+
+    title "Resumen"
+    hr
+    [ "$wildcard_ok" = "true" ] && ok "DNS wildcard configurado" || warn "DNS wildcard no confirmado"
+    [ "$proxy_ok" = "true" ] && ok "Coolify/Traefik maneja 80/443" || fail "Coolify/Traefik no confirmado en 80/443"
+    [ "$http_open" = "true" ] && [ "$https_open" = "true" ] && ok "UFW permite 80/443" || fail "UFW no permite 80/443"
+    [ "$monitor_port_public" = "false" ] && ok "Monitor preparado para Coolify sin puerto host publico" || fail "Monitor expone puerto host publico"
+    [ "$dns_proxy_count" -eq 0 ] || warn "Cloudflare esta proxied: recomendable DNS only durante emision inicial de SSL"
+    [ "$nginx_conflict" = "false" ] || fail "Nginx del host activo compitiendo con Traefik"
+    sep
+    if [ "$overall_ok" = "true" ]; then
+        ok "Nodo listo para arquitectura Cloudflare DNS -> Coolify/Traefik -> Apps."
+    else
+        warn "Requiere accion antes de considerarlo listo. No se declara 'todo en orden'."
+    fi
+    hr
+}
+
+confirm_host_nginx_legacy() {
+    title "MODO LEGACY: host-nginx"
+    hr
+    fail "Este modo NO debe usarse si Coolify/Traefik maneja 80/443."
+    warn "Puede crear configuracion de Nginx del host para instalaciones antiguas."
+    warn "La arquitectura recomendada publica el monitor como app en Coolify."
+    sep
+    printf "%b" "  Escribe exactamente USAR HOST NGINX para continuar: " >&2
+    read -r confirm </dev/tty
+    [ "$confirm" = "USAR HOST NGINX" ] || { warn "Modo legacy cancelado."; exit 1; }
+}
+
+run_host_nginx_legacy() {
+    confirm_host_nginx_legacy
+    if [ "$EUID" -ne 0 ]; then
+        fail "El modo host-nginx requiere root. Ejecuta con sudo."
+        exit 1
+    fi
+    if ! command -v nginx >/dev/null 2>&1; then
+        printf "%b" "  Instalar Nginx ahora? [s/N]: " >&2
+        read -r install_nginx </dev/tty
+        if [[ "${install_nginx,,}" = "s" ]]; then
+            apt-get update
+            apt-get install -y nginx
+        else
+            fail "Nginx no instalado."
+            exit 1
+        fi
+    fi
+
+    local conf_path="/etc/nginx/sites-available/adema-monitor-legacy.conf"
+    local enabled_path="/etc/nginx/sites-enabled/adema-monitor-legacy.conf"
+    local backup_dir="/etc/adema/backups/nginx-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$backup_dir"
+    [ -f "$conf_path" ] && cp -a "$conf_path" "$backup_dir/" || true
+
+    cat > "$conf_path" <<NGINXEOF
+# Adema Monitor legacy host-nginx proxy
+# Generado por setup_domains.sh --proxy-mode host-nginx
 server {
     listen 80;
     listen [::]:80;
-    server_name ${domain};
-
-    # Redirigir a HTTPS si ya tienes certbot instalado
-    # return 301 https://\$host\$request_uri;
+    server_name ${MONITOR_DOMAIN};
 
     location / {
-        proxy_pass http://${bind}:${port};
+        proxy_pass http://127.0.0.1:${MONITOR_INTERNAL_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection ${connection_header};
-        proxy_read_timeout ${read_timeout};
-        proxy_buffering off;
     }
 }
-"
-
-    if [ "$EUID" -ne 0 ]; then
-        warn "Se requiere root para escribir en /etc/nginx/. Ejecuta con sudo."
-        sep
-        log "Contenido generado para ${conf_path}:"
-        echo "$nginx_content"
-        return
-    fi
-
-    # Verificar si el archivo ya existe con el mismo contenido
-    if [ -f "$conf_path" ]; then
-        local existing
-        existing=$(cat "$conf_path")
-        if [ "$existing" = "$nginx_content" ]; then
-            ok "Configuracion Nginx ya existente y sin cambios: ${conf_path}"
-        else
-            warn "El archivo ${conf_path} ya existe con contenido diferente."
-            printf "%b" "  ¿Sobreescribir? [s/N]: " >&2
-            read -r _overwrite </dev/tty
-            if [[ "${_overwrite,,}" != "s" ]]; then
-                log "Se conserva configuracion existente."
-                return
-            fi
-            echo "$nginx_content" > "$conf_path"
-            ok "Configuracion Nginx actualizada: ${conf_path}"
-        fi
-    else
-        echo "$nginx_content" > "$conf_path"
-        ok "Configuracion Nginx creada: ${conf_path}"
-    fi
-
-    # Crear symlink si no existe
-    if [ ! -L "$enabled_path" ]; then
-        ln -s "$conf_path" "$enabled_path"
-        ok "Symlink creado: ${enabled_path}"
-    else
-        ok "Symlink ya existente: ${enabled_path}"
-    fi
-
-    # Verificar configuracion de nginx
-    if command -v nginx >/dev/null 2>&1; then
-        if nginx -t 2>/dev/null; then
-            ok "Configuracion Nginx valida."
-            nginx -s reload 2>/dev/null && ok "Nginx recargado correctamente." || warn "No se pudo recargar Nginx. Ejecuta: sudo nginx -s reload"
-        else
-            warn "Error en configuracion Nginx. Revisa con: sudo nginx -t"
-        fi
-    else
-        warn "Nginx no instalado. Instala con: sudo apt install -y nginx"
-    fi
+NGINXEOF
+    ln -sf "$conf_path" "$enabled_path"
+    nginx -t
+    systemctl reload nginx || systemctl restart nginx
+    ok "Config legacy creada: $conf_path"
+    warn "No se ejecuto certbot. En arquitectura Coolify no uses certbot del host."
 }
 
-# ── Instalar certbot (SOLO muestra comando, no ejecuta) ───────────────────────
-suggest_certbot() {
-    local infra_domain="$1"
-
-    sep
-    title "SSL con Let's Encrypt (certbot)"
-    hr
-    log "Para habilitar HTTPS en ${infra_domain}, ejecuta el siguiente comando:"
-    sep
-    echo -e "  ${CYAN}sudo certbot --nginx -d ${infra_domain}${RESET}" >&2
-    sep
-    log "Requisitos antes de correr certbot:"
-    echo "  - El dominio ${infra_domain} ya debe apuntar a este servidor (DNS OK)" >&2
-    echo "  - El puerto 80 debe estar abierto en UFW" >&2
-    echo "  - Nginx debe estar corriendo con la config generada por este script" >&2
-    sep
-    warn "Certbot NO se ejecutara automaticamente. Corre el comando manualmente cuando el DNS este listo."
-
-    if [ "$EUID" -eq 0 ]; then
-        printf "%b" "\n  ¿Ejecutar certbot ahora? [s/N]: " >&2
-        read -r _run_certbot </dev/tty
-        if [[ "${_run_certbot,,}" = "s" ]]; then
-            certbot --nginx -d "$infra_domain"
-        else
-            log "Certbot omitido. Ejecutalo manualmente cuando el DNS este confirmado."
-        fi
-    fi
-}
-
-# ── Imprimir instrucciones Cloudflare ─────────────────────────────────────────
-print_cloudflare_instructions() {
-    local server_ip="$1"
-    local infra_domain="$2"
-    local deploy_domain="$3"
-
-    # Extraer nombre (parte antes del primer punto)
-    local infra_name deploy_name base_domain
-    infra_name="${infra_domain%%.*}"
-    deploy_name="${deploy_domain%%.*}"
-    base_domain="${infra_domain#*.}"
-
-    title "Configuracion DNS en Cloudflare"
-    hr
-    log "Ingresa al panel de Cloudflare → Dominio: ${BOLD}${base_domain}${RESET} → DNS → Registros"
-    sep
-    log "Si ${BOLD}${base_domain}${RESET} es un dominio dedicado a este nodo (sin otros servicios externos),"
-    log "la forma mas simple es un ${BOLD}registro wildcard${RESET} que cubre todos los subdominios:"
-    sep
-    echo -e "  ${BOLD}Registro recomendado — Wildcard (cubre todos los subdominios)${RESET}" >&2
-    echo -e "    Tipo:      ${CYAN}A${RESET}" >&2
-    echo -e "    Nombre:    ${CYAN}*${RESET}  (asterisco)" >&2
-    echo -e "    Contenido: ${CYAN}${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}${RESET}" >&2
-    echo -e "    TTL:       Auto" >&2
-    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}  ← requerido para SSL con certbot/Traefik" >&2
-    sep
-    echo -e "  ${BOLD}Registro opcional — Raiz del dominio${RESET}" >&2
-    echo -e "    Tipo:      ${CYAN}A${RESET}" >&2
-    echo -e "    Nombre:    ${CYAN}@${RESET}  (raiz)" >&2
-    echo -e "    Contenido: ${CYAN}${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}${RESET}" >&2
-    echo -e "    TTL:       Auto" >&2
-    echo -e "    Proxy:     ${YELLOW}DNS only (nube gris)${RESET}" >&2
-    sep
-    log "Con el wildcard, ${CYAN}${infra_domain}${RESET} y ${CYAN}${deploy_domain}${RESET} quedan resueltos"
-    log "automaticamente. Cualquier nueva app en Coolify tambien queda cubierta sin tocar Cloudflare."
-    sep
-    warn "El wildcard SOLO resuelve DNS. Cada app sigue necesitando configurar"
-    warn "su dominio en la UI de Coolify (o en el archivo Traefik) para que el proxy la enrute."
-    sep
-    log "Si ${BOLD}${base_domain}${RESET} ya tiene otros servicios en subdominios que apuntan a proveedores"
-    log "distintos, podes usar registros A explicitos en lugar del wildcard:"
-    echo -e "    ${CYAN}${infra_name}${RESET} → ${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}  (panel Adema Core)" >&2
-    echo -e "    ${CYAN}${deploy_name}${RESET} → ${server_ip:-[IP_PUBLICA_DEL_SERVIDOR]}  (Coolify)" >&2
-    log "Ambos enfoques son validos y pueden coexistir si es necesario."
-    sep
-    warn "¿Por que DNS only?  Coolify y certbot necesitan resolver el IP real del servidor."
-    warn "Activar el proxy de Cloudflare puede interferir con la validacion ACME de Let's Encrypt."
-    warn "Una vez con SSL estable, puedes activar el proxy de Cloudflare si lo deseas."
-    hr
-}
-
-# ── Sugerir apertura de puertos UFW ──────────────────────────────────────────
-suggest_ufw_rules() {
-    local http_status="$1"
-    local https_status="$2"
-
-    if [ "$http_status" = "open" ] && [ "$https_status" = "open" ]; then
-        ok "UFW: 80/tcp y 443/tcp ya estan abiertos."
-        return
-    fi
-
-    sep
-    title "Reglas UFW recomendadas"
-    hr
-    warn "Algunos puertos necesarios para HTTPS no estan abiertos:"
-
-    if [ "$http_status" != "open" ]; then
-        echo -e "  ${YELLOW}Puerto 80 no abierto.${RESET} Ejecuta:" >&2
-        echo -e "  ${CYAN}sudo ufw allow 80/tcp comment 'HTTP'${RESET}" >&2
-    else
-        ok "Puerto 80/tcp: abierto."
-    fi
-
-    if [ "$https_status" != "open" ]; then
-        echo -e "  ${YELLOW}Puerto 443 no abierto.${RESET} Ejecuta:" >&2
-        echo -e "  ${CYAN}sudo ufw allow 443/tcp comment 'HTTPS'${RESET}" >&2
-    else
-        ok "Puerto 443/tcp: abierto."
-    fi
-
-    if [ "$http_status" = "ufw_inactive" ] || [ "$https_status" = "ufw_inactive" ]; then
-        warn "UFW esta inactivo. Si no usas otro firewall, puedes activarlo con:"
-        echo -e "  ${CYAN}sudo ufw allow OpenSSH${RESET}" >&2
-        echo -e "  ${CYAN}sudo ufw allow 80/tcp comment 'HTTP'${RESET}" >&2
-        echo -e "  ${CYAN}sudo ufw allow 443/tcp comment 'HTTPS'${RESET}" >&2
-        echo -e "  ${CYAN}sudo ufw --force enable${RESET}" >&2
-    fi
-
-    hr
-    warn "IMPORTANTE: No abras el puerto ${ADEMA_PANEL_PORT} publicamente."
-    log "El panel en :${ADEMA_PANEL_PORT} es accesible a traves del proxy reverso (Nginx o Coolify)."
-}
-
-# ── Imprimir instrucciones MODO B (Coolify como proxy) ───────────────────────
-print_coolify_proxy_instructions() {
-    local infra_domain="$1"
-    local panel_port="$2"
-    local panel_bind="$3"
-
-    title "MODO B: Publicar panel a traves de Coolify"
-    hr
-    warn "Coolify o Traefik ya esta usando los puertos 80/443."
-    warn "NO se instalara Nginx del host para evitar conflictos."
-    sep
-    log "Para acceder a ${infra_domain} a traves de Coolify:"
-    sep
-    echo -e "  ${BOLD}Opcion recomendada: Proxy en Coolify${RESET}" >&2
-    echo "" >&2
-    echo -e "  1. En Coolify → Settings → Proxy → Traefik Dashboard" >&2
-    echo -e "     O bien: crea un nuevo servicio de tipo 'Generic'." >&2
-    echo "" >&2
-    echo -e "  2. Crea una aplicacion 'Redirect' o 'Generic' en Coolify:" >&2
-    echo -e "     - Domain:  ${CYAN}https://${infra_domain}${RESET}" >&2
-    echo -e "     - Proxy a: ${CYAN}http://${panel_bind}:${panel_port}${RESET}" >&2
-    echo "" >&2
-    echo -e "  3. Alternativa via archivo Traefik en /etc/coolify/proxy/dynamic/:" >&2
-    echo "" >&2
-    echo -e "     Crea el archivo:" >&2
-    echo -e "     ${CYAN}/etc/coolify/proxy/dynamic/adema-core.yml${RESET}" >&2
-    echo "" >&2
-    cat >&2 <<TRAEFIK_YAML
-     Contenido del archivo:
-     ──────────────────────────────────────────────
-     http:
-       routers:
-         adema-core:
-           rule: "Host(\`${infra_domain}\`)"
-           service: adema-core-svc
-           entryPoints:
-             - websecure
-           tls:
-             certResolver: letsencrypt
-
-       services:
-         adema-core-svc:
-           loadBalancer:
-             servers:
-               - url: "http://${panel_bind}:${panel_port}"
-     ──────────────────────────────────────────────
-TRAEFIK_YAML
-    sep
-    warn "Coolify gestiona el SSL automaticamente con su certResolver configurado."
-    log "Despues de agregar la config, verifica en los logs de Traefik que el router este activo."
-    hr
-}
-
-# ── Diagnostico cuando el panel no responde ───────────────────────────────────
-diagnose_panel_down() {
-    sep
-    title "Diagnostico: panel local no responde"
-    hr
-    warn "El panel en http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/ no esta respondiendo."
-    sep
-    log "Verifica el estado del servicio:"
-    echo -e "  ${CYAN}sudo systemctl status adema-web-panel.service${RESET}" >&2
-    echo -e "  ${CYAN}sudo journalctl -u adema-web-panel.service -n 80 --no-pager${RESET}" >&2
-    sep
-    log "Si el servicio no existe, instala el panel con:"
-    echo -e "  ${CYAN}sudo bash setup_web_panel.sh${RESET}" >&2
-    sep
-
-    if command -v systemctl >/dev/null 2>&1; then
-        log "Estado actual del servicio:"
-        systemctl status adema-web-panel.service --no-pager 2>/dev/null || \
-            warn "No se pudo consultar el estado (puede requerir sudo)."
-    fi
-    hr
-}
-
-# ── Función de verificaciones completa ────────────────────────────────────────
-run_checks() {
-    local server_ip
-    server_ip=$(detect_public_ip)
-
-    local infra_resolved deploy_resolved
-    infra_resolved=$(resolve_domain "${ADEMA_INFRA_DOMAIN:-}")
-    deploy_resolved=$(resolve_domain "${ADEMA_DEPLOY_DOMAIN:-}")
-
-    local infra_ok="false" deploy_ok="false"
-    local infra_resolves="false" deploy_resolves="false"
-    local infra_via_proxy="false" deploy_via_proxy="false"
-    if [ -n "$infra_resolved" ]; then
-        infra_resolves="true"
-        if [ -n "$server_ip" ] && [ "$infra_resolved" = "$server_ip" ]; then
-            infra_ok="true"
-        else
-            infra_via_proxy="true"
-        fi
-    fi
-    if [ -n "$deploy_resolved" ]; then
-        deploy_resolves="true"
-        if [ -n "$server_ip" ] && [ "$deploy_resolved" = "$server_ip" ]; then
-            deploy_ok="true"
-        else
-            deploy_via_proxy="true"
-        fi
-    fi
-
-    local http_status https_status
-    http_status=$(ufw_port_status 80)
-    https_status=$(ufw_port_status 443)
-    local http_open="false" https_open="false"
-    [ "$http_status" = "open" ] && http_open="true"
-    [ "$https_status" = "open" ] && https_open="true"
-
-    local panel_status
-    panel_status=$(check_panel_local "$ADEMA_PANEL_PORT" "$ADEMA_PANEL_BIND")
-    local panel_responding="false"
-    [ "$panel_status" = "up" ] && panel_responding="true"
-
-    local proxy_mode
-    proxy_mode=$(detect_proxy_on_ports)
-
-    local proxy_compat_mode="A"
-    if [ "$proxy_mode" = "coolify" ] || [ "$proxy_mode" = "caddy" ]; then
-        proxy_compat_mode="B"
-    fi
-
-    local overall_ok="true"
-    # DNS ok si resuelve a algo (directo o via CDN); panel debe responder
-    if [ "$infra_resolves" = "false" ] || [ "$deploy_resolves" = "false" ] || [ "$panel_responding" = "false" ]; then
-        overall_ok="false"
-    fi
-
-    # ── Salida JSON ──────────────────────────────────────────────────────────
-    if [ "$MODE_JSON" -eq 1 ]; then
-        printf '{\n'
-        printf '  "ok": %s,\n'                       "$overall_ok"
-        printf '  "infra_domain": "%s",\n'            "${ADEMA_INFRA_DOMAIN:-}"
-        printf '  "deploy_domain": "%s",\n'           "${ADEMA_DEPLOY_DOMAIN:-}"
-        printf '  "server_ip": "%s",\n'               "$server_ip"
-        printf '  "dns": {\n'
-        printf '    "infra_resolved": "%s",\n'        "$infra_resolved"
-        printf '    "deploy_resolved": "%s",\n'       "$deploy_resolved"
-        printf '    "infra_resolves": %s,\n'           "$infra_resolves"
-        printf '    "deploy_resolves": %s,\n'          "$deploy_resolves"
-        printf '    "infra_points_to_server": %s,\n'  "$infra_ok"
-        printf '    "deploy_points_to_server": %s,\n' "$deploy_ok"
-        printf '    "infra_via_proxy": %s,\n'          "$infra_via_proxy"
-        printf '    "deploy_via_proxy": %s\n'          "$deploy_via_proxy"
-        printf '  },\n'
-        printf '  "firewall": {\n'
-        printf '    "ufw_http": "%s",\n'              "$http_status"
-        printf '    "ufw_https": "%s",\n'             "$https_status"
-        printf '    "http_open": %s,\n'               "$http_open"
-        printf '    "https_open": %s,\n'              "$https_open"
-        printf '    "panel_port_public_required": false\n'
-        printf '  },\n'
-        printf '  "panel": {\n'
-        printf '    "local_url": "http://%s:%s/",\n'  "$ADEMA_PANEL_BIND" "$ADEMA_PANEL_PORT"
-        printf '    "responding": %s\n'               "$panel_responding"
-        printf '  },\n'
-        printf '  "proxy": {\n'
-        printf '    "detected": "%s",\n'              "$proxy_mode"
-        printf '    "mode": "%s"\n'                   "$proxy_compat_mode"
-        printf '  }\n'
-        printf '}\n'
-        return
-    fi
-
-    # ── Salida legible para humanos ──────────────────────────────────────────
-    title "IP publica del servidor"
-    hr
-    if [ -n "$server_ip" ]; then
-        ok "IP detectada: ${BOLD}${server_ip}${RESET}"
-    else
-        warn "No se pudo detectar la IP publica (curl fallido o sin internet)."
-    fi
-
-    title "Verificacion DNS"
-    hr
-
-    if [ -n "${ADEMA_INFRA_DOMAIN:-}" ]; then
-        if [ "$infra_ok" = "true" ]; then
-            ok "${ADEMA_INFRA_DOMAIN} → ${infra_resolved} ✓"
-        elif [ "$infra_via_proxy" = "true" ]; then
-            ok "${ADEMA_INFRA_DOMAIN} → ${infra_resolved} (via CDN/proxy, no IP directa del servidor)"
-            log "El dominio resuelve correctamente. Si usas Cloudflare proxy (nube naranja), la IP que ve dig es de Cloudflare."
-        else
-            warn "${ADEMA_INFRA_DOMAIN} → [sin resolver] (esperado: ${server_ip:-desconocido})"
-            log "No apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
-        fi
-    else
-        warn "ADEMA_INFRA_DOMAIN no configurado."
-    fi
-
-    if [ -n "${ADEMA_DEPLOY_DOMAIN:-}" ]; then
-        if [ "$deploy_ok" = "true" ]; then
-            ok "${ADEMA_DEPLOY_DOMAIN} → ${deploy_resolved} ✓"
-        elif [ "$deploy_via_proxy" = "true" ]; then
-            ok "${ADEMA_DEPLOY_DOMAIN} → ${deploy_resolved} (via CDN/proxy, no IP directa del servidor)"
-            log "El dominio resuelve correctamente. Si usas Cloudflare proxy (nube naranja), la IP que ve dig es de Cloudflare."
-        else
-            warn "${ADEMA_DEPLOY_DOMAIN} → [sin resolver] (esperado: ${server_ip:-desconocido})"
-            log "No apunta al servidor. Agrega el registro A en Cloudflare y espera la propagacion DNS."
-        fi
-    else
-        warn "ADEMA_DEPLOY_DOMAIN no configurado."
-    fi
-
-    title "Firewall UFW"
-    hr
-    suggest_ufw_rules "$http_status" "$https_status"
-
-    title "Panel local"
-    hr
-    if [ "$panel_responding" = "true" ]; then
-        ok "http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/ → respondiendo ✓"
-    else
-        diagnose_panel_down
-    fi
-
-    title "Proxy en puertos 80/443"
-    hr
-    case "$proxy_mode" in
-        coolify) ok "Coolify/Traefik detectado en 80/443 → MODO B (proxy via Coolify)" ;;
-        caddy)   ok "Caddy detectado en 80/443 → MODO B (no instalar Nginx del host)" ;;
-        nginx)   ok "Nginx detectado en 80/443 → el script puede gestionar la config" ;;
-        other)   warn "Proceso desconocido en 80/443. Verifica con: sudo ss -tulpn | grep -E ':80|:443'" ;;
-        free)    log "Puertos 80/443 libres → MODO A disponible (instalar Nginx del host)" ;;
-    esac
-
-    sep
-    title "Resumen"
-    hr
-    [ "$infra_ok" = "true" ]         && ok  "DNS infra:     OK (directo)" \
-      || { [ "$infra_via_proxy" = "true" ] && ok "DNS infra:     OK (via CDN/proxy)" || warn "DNS infra:     pendiente (sin resolver)"; }
-    [ "$deploy_ok" = "true" ]         && ok  "DNS deploy:    OK (directo)" \
-      || { [ "$deploy_via_proxy" = "true" ] && ok "DNS deploy:    OK (via CDN/proxy)" || warn "DNS deploy:    pendiente (sin resolver)"; }
-    [ "$http_open" = "true" ]      && ok  "UFW 80/tcp:    abierto" || warn "UFW 80/tcp:    cerrado"
-    [ "$https_open" = "true" ]     && ok  "UFW 443/tcp:   abierto" || warn "UFW 443/tcp:   cerrado"
-    [ "$panel_responding" = "true" ] && ok "Panel local:   activo"  || warn "Panel local:   sin respuesta"
-    sep
-
-    if [ "$overall_ok" = "true" ]; then
-        ok "${BOLD}Todo en orden. El nodo esta listo para operar por dominio.${RESET}"
-    else
-        warn "${BOLD}Algunos items necesitan atencion antes de operar por dominio.${RESET}"
-        log "Consulta docs/09-domain-setup.md para el procedimiento completo."
-    fi
-    hr
-}
-
-# ── Modo --check: solo verificar ─────────────────────────────────────────────
 if [ "$MODE_CHECK" -eq 1 ]; then
-    if [ -z "${ADEMA_BASE_DOMAIN:-}" ] && [ -z "${ADEMA_INFRA_DOMAIN:-}" ]; then
+    if [ -z "$BASE_DOMAIN" ] && [ -z "$MONITOR_DOMAIN" ]; then
         if [ "$MODE_JSON" -eq 1 ]; then
-            printf '{"ok":false,"error":"domains_not_configured","message":"ADEMA_BASE_DOMAIN no definido. Define la variable o crea /etc/adema/domains.env."}\n'
+            printf '{"ok":false,"error":"domains_not_configured","message":"BASE_DOMAIN no definido. Define la variable o crea /etc/adema/domains.env."}\n'
             exit 0
         fi
-        err_msg "ADEMA_BASE_DOMAIN no definido y no se encontro ${DOMAINS_ENV_FILE}."
-        log "Opciones:"
-        echo "  1) Correr el asistente interactivo para generarlo automaticamente:" >&2
-        echo "       sudo bash monitor/setup_domains.sh" >&2
-        echo "" >&2
-        echo "  2) Crearlo manualmente desde el template:" >&2
-        echo "       sudo mkdir -p /etc/adema" >&2
-        echo "       sudo cp ${SCRIPT_DIR}/.domains.env.example /etc/adema/domains.env" >&2
-        echo "       sudo nano /etc/adema/domains.env" >&2
+        err_msg "BASE_DOMAIN no definido y no se encontro configuracion suficiente."
+        log "Crea $DOMAINS_ENV_FILE desde ${SCRIPT_DIR}/.domains.env.example o ejecuta el asistente."
         exit 1
     fi
-
-    # Derivar dominios si solo se tiene la base
-    if [ -n "${ADEMA_BASE_DOMAIN:-}" ]; then
-        ADEMA_INFRA_DOMAIN="${ADEMA_INFRA_DOMAIN:-infra.${ADEMA_BASE_DOMAIN}}"
-        ADEMA_DEPLOY_DOMAIN="${ADEMA_DEPLOY_DOMAIN:-deploy.${ADEMA_BASE_DOMAIN}}"
-    fi
-
     run_checks
     exit 0
 fi
 
-# ── Modo interactivo completo ─────────────────────────────────────────────────
+if [ "$PUBLIC_PROXY_MODE" = "host-nginx" ]; then
+    prompt_if_empty BASE_DOMAIN "Dominio base del nodo" "ademasistemas.com"
+    ROOT_DOMAIN="${ROOT_DOMAIN:-$BASE_DOMAIN}"
+    MONITOR_DOMAIN="${MONITOR_DOMAIN:-monitor.${BASE_DOMAIN}}"
+    run_host_nginx_legacy
+    exit 0
+fi
+
+if [ "$PUBLIC_PROXY_MODE" != "coolify-traefik" ]; then
+    err_msg "PUBLIC_PROXY_MODE invalido: $PUBLIC_PROXY_MODE. Usa coolify-traefik o host-nginx."
+    exit 2
+fi
+
 clear >&2 || true
-title "Adema Core - Configuracion de dominios"
+title "Adema Core - Bootstrap DNS para Coolify/Traefik"
 hr
-log "Este asistente configura acceso por dominio al panel y a Coolify."
-log "Puedes cancelar en cualquier momento con Ctrl+C."
-if [ ! -f "$DOMAINS_ENV_FILE" ]; then
-    sep
-    log "No se encontro ${DOMAINS_ENV_FILE}."
-    log "Al finalizar, el asistente ofrecera guardarlo. Si prefieres crearlo manualmente:"
-    echo "    sudo cp ${SCRIPT_DIR}/.domains.env.example /etc/adema/domains.env" >&2
-    echo "    sudo nano /etc/adema/domains.env" >&2
-fi
+log "Cloudflare solo resuelve DNS; Coolify/Traefik es el unico proxy publico en 80/443."
+log "deploy.* apunta al panel Coolify; monitor.* apunta al monitor ADEMA como app."
+warn "infra.* queda legacy/deprecated y no se usara como dominio principal."
 sep
 
-prompt_if_empty ADEMA_BASE_DOMAIN "Dominio base del servidor (ej: ademasistemas.com)" ""
-ADEMA_INFRA_DOMAIN="${ADEMA_INFRA_DOMAIN:-infra.${ADEMA_BASE_DOMAIN}}"
-ADEMA_DEPLOY_DOMAIN="${ADEMA_DEPLOY_DOMAIN:-deploy.${ADEMA_BASE_DOMAIN}}"
-prompt_if_empty ADEMA_INFRA_DOMAIN "Dominio panel Adema Core" "${ADEMA_INFRA_DOMAIN}"
-prompt_if_empty ADEMA_DEPLOY_DOMAIN "Dominio Coolify" "${ADEMA_DEPLOY_DOMAIN}"
-prompt_if_empty ADEMA_PANEL_PORT "Puerto del panel local" "5000"
-prompt_if_empty ADEMA_PANEL_BIND "Bind del panel local" "127.0.0.1"
-prompt_if_empty ADEMA_COOLIFY_PORT "Puerto local de Coolify" "8000"
+prompt_if_empty BASE_DOMAIN "Dominio base del nodo" "ademasistemas.com"
+ROOT_DOMAIN="${ROOT_DOMAIN:-$BASE_DOMAIN}"
+WWW_DOMAIN="${WWW_DOMAIN:-www.${BASE_DOMAIN}}"
+COOLIFY_DOMAIN="${COOLIFY_DOMAIN:-deploy.${BASE_DOMAIN}}"
+MONITOR_DOMAIN="${MONITOR_DOMAIN:-monitor.${BASE_DOMAIN}}"
+CLIENTES_DOMAIN="${CLIENTES_DOMAIN:-clientes.${BASE_DOMAIN}}"
+API_DOMAIN="${API_DOMAIN:-api.${BASE_DOMAIN}}"
+CREDITOS_DOMAIN="${CREDITOS_DOMAIN:-creditos.${BASE_DOMAIN}}"
+STOCK_DOMAIN="${STOCK_DOMAIN:-stock.${BASE_DOMAIN}}"
+ACADEMY_DOMAIN="${ACADEMY_DOMAIN:-academy.${BASE_DOMAIN}}"
+prompt_if_empty MONITOR_INTERNAL_PORT "Puerto interno del monitor" "5000"
 
 sep
-log "Configuracion:"
-log "  Dominio infra:   ${ADEMA_INFRA_DOMAIN}  (panel → :${ADEMA_PANEL_PORT})"
-log "  Dominio deploy:  ${ADEMA_DEPLOY_DOMAIN}  (Coolify → :${ADEMA_COOLIFY_PORT})"
-log "  Panel local:     http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/"
+log "Matriz de dominios objetivo:"
+echo "  ${ROOT_DOMAIN}              -> web institucional" >&2
+echo "  ${WWW_DOMAIN}          -> alias web institucional" >&2
+echo "  ${COOLIFY_DOMAIN}       -> panel Coolify" >&2
+echo "  ${MONITOR_DOMAIN}      -> Adema Monitor" >&2
+echo "  ${CLIENTES_DOMAIN}     -> CRM interno" >&2
+echo "  ${API_DOMAIN}          -> API central" >&2
+echo "  ${CREDITOS_DOMAIN}     -> Gestion de Creditos" >&2
+echo "  ${STOCK_DOMAIN}        -> Stock" >&2
+echo "  ${ACADEMY_DOMAIN}      -> Academia" >&2
 sep
 
-# Ofrecer guardar en /etc/adema/domains.env
-if [ "$EUID" -eq 0 ]; then
-    printf "%b" "  ¿Guardar configuracion en ${DOMAINS_ENV_FILE}? [S/n]: " >&2
-    read -r _save_env </dev/tty
-    if [[ "${_save_env,,}" != "n" ]]; then
-        mkdir -p "$(dirname "$DOMAINS_ENV_FILE")"
-        cat > "$DOMAINS_ENV_FILE" <<ENVEOF
-# Adema Core - Configuracion de dominios
-# Generado por setup_domains.sh
-ADEMA_BASE_DOMAIN=${ADEMA_BASE_DOMAIN}
-ADEMA_INFRA_DOMAIN=${ADEMA_INFRA_DOMAIN}
-ADEMA_DEPLOY_DOMAIN=${ADEMA_DEPLOY_DOMAIN}
-ADEMA_PANEL_PORT=${ADEMA_PANEL_PORT}
-ADEMA_PANEL_BIND=${ADEMA_PANEL_BIND}
-ADEMA_COOLIFY_PORT=${ADEMA_COOLIFY_PORT}
-ENVEOF
-        chmod 640 "$DOMAINS_ENV_FILE"
-        ok "Configuracion guardada en ${DOMAINS_ENV_FILE}"
-    fi
-fi
-
-# Detectar IP y mostrar instrucciones Cloudflare
+write_domains_env
 SERVER_IP=$(detect_public_ip)
-print_cloudflare_instructions "$SERVER_IP" "$ADEMA_INFRA_DOMAIN" "$ADEMA_DEPLOY_DOMAIN"
+print_cloudflare_instructions "$SERVER_IP"
+print_coolify_instructions
 
-sep
-title "Esperando confirmacion DNS"
+title "Firewall UFW"
 hr
-printf "%b" "  Continuar cuando hayas creado los registros DNS en Cloudflare [Enter o Ctrl+C para salir]: " >&2
-read -r _ </dev/tty
-
-# Ejecutar verificaciones
-run_checks
-
-# Detectar modo proxy
-PROXY_MODE=$(detect_proxy_on_ports)
+ensure_ufw_rules
 
 sep
-case "$PROXY_MODE" in
-    coolify|caddy)
-        print_coolify_proxy_instructions "$ADEMA_INFRA_DOMAIN" "$ADEMA_PANEL_PORT" "$ADEMA_PANEL_BIND"
-        ;;
-    *)
-        title "Configuracion de proxy reverso (MODO A - Nginx del host)"
-        hr
-
-        if ! command -v nginx >/dev/null 2>&1; then
-            warn "Nginx no esta instalado."
-            printf "%b" "  ¿Instalar Nginx ahora? [S/n]: " >&2
-            read -r _install_nginx </dev/tty
-            if [[ "${_install_nginx,,}" != "n" ]]; then
-                if [ "$EUID" -ne 0 ]; then
-                    warn "Se requiere root. Ejecuta: sudo apt install -y nginx"
-                else
-                    apt-get install -y nginx
-                    ok "Nginx instalado."
-                fi
-            fi
-        else
-            ok "Nginx instalado: $(nginx -v 2>&1 || true)"
-        fi
-
-        sep
-        printf "%b" "  ¿Generar config Nginx para ${ADEMA_INFRA_DOMAIN} (panel → :${ADEMA_PANEL_PORT})? [S/n]: " >&2
-        read -r _gen_nginx </dev/tty
-        if [[ "${_gen_nginx,,}" != "n" ]]; then
-            generate_nginx_config "$ADEMA_INFRA_DOMAIN" "$ADEMA_PANEL_PORT" "$ADEMA_PANEL_BIND" "adema-core" "0"
-        fi
-
-        sep
-        printf "%b" "  ¿Generar config Nginx para ${ADEMA_DEPLOY_DOMAIN} (Coolify → :${ADEMA_COOLIFY_PORT})? [S/n]: " >&2
-        read -r _gen_deploy </dev/tty
-        if [[ "${_gen_deploy,,}" != "n" ]]; then
-            generate_nginx_config "$ADEMA_DEPLOY_DOMAIN" "$ADEMA_COOLIFY_PORT" "127.0.0.1" "coolify-deploy" "1"
-        fi
-
-        suggest_certbot "$ADEMA_INFRA_DOMAIN"
-        if [ -n "${ADEMA_DEPLOY_DOMAIN:-}" ]; then
-            suggest_certbot "$ADEMA_DEPLOY_DOMAIN"
-        fi
-        ;;
-esac
+printf "%b" "  Continuar con diagnostico ahora? [S/n]: " >&2
+read -r run_diag </dev/tty
+if [[ "${run_diag,,}" != "n" ]]; then
+    run_checks
+fi
 
 sep
-title "Configuracion completada"
+title "Siguiente paso"
 hr
-ok  "Panel Adema Core:  https://${ADEMA_INFRA_DOMAIN}"
-log "Coolify:           https://${ADEMA_DEPLOY_DOMAIN}"
-log "Panel local:       http://${ADEMA_PANEL_BIND}:${ADEMA_PANEL_PORT}/"
-sep
-log "Para verificar el estado en cualquier momento:"
-echo -e "  ${CYAN}bash monitor/setup_domains.sh --check${RESET}" >&2
-log "Para obtener estado en JSON (uso por API):"
-echo -e "  ${CYAN}bash monitor/setup_domains.sh --check --json${RESET}" >&2
+log "En Coolify, crea el recurso adema-monitor desde este repo y asigna https://${MONITOR_DOMAIN}."
+log "El puerto interno esperado es ${MONITOR_INTERNAL_PORT}; no publiques puerto host."
+log "Ejecuta diagnostico completo con: bash scripts/diagnose_node.sh"
 hr

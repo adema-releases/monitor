@@ -13,6 +13,7 @@ import secrets
 import shutil
 import tempfile
 import threading
+import urllib.parse
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, asdict
@@ -28,7 +29,7 @@ from flask_limiter.util import get_remote_address
 
 ROOT_DIR = Path(__file__).resolve().parent
 # Ruta absoluta esperada en produccion; permite override por variable de entorno.
-MONITOR_DIR = Path(os.getenv("ADEMA_MONITOR_DIR", "/home/adema/monitor/monitor")).resolve()
+MONITOR_DIR = Path(os.getenv("ADEMA_MONITOR_DIR", "/opt/adema-node/monitor")).resolve()
 STATUS_SCRIPT = MONITOR_DIR / "status_snapshot.sh"
 CREATE_SCRIPT = MONITOR_DIR / "create_tenant.sh"
 TEST_DB_SCRIPT = MONITOR_DIR / "test_tenant_db.sh"
@@ -43,18 +44,23 @@ CLIENT_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 DB_PASSWORD_RE = re.compile(r"^[a-zA-Z0-9@#%+=:._-]{8,128}$")
 
 TOKEN = os.getenv("ADEMA_WEB_TOKEN", "").strip()
-HOST = os.getenv("ADEMA_WEB_HOST", "0.0.0.0")
+HOST = os.getenv("ADEMA_WEB_HOST", "127.0.0.1")
 PORT = int(os.getenv("ADEMA_WEB_PORT", "5000"))
+ALLOW_QUERY_TOKEN = os.getenv("ADEMA_ALLOW_QUERY_TOKEN", "0").strip().lower() in {"1", "true", "yes", "si"}
 MAX_CONCURRENT_JOBS = int(os.getenv("ADEMA_MAX_JOBS", "4"))
 MIN_BACKUP_FREE_MB = int(os.getenv("ADEMA_MIN_BACKUP_FREE_MB", "500"))
 SNAPSHOT_TIMEOUT_SEC = int(os.getenv("ADEMA_SNAPSHOT_TIMEOUT_SEC", "12"))
 ENV_FILE_PATH = os.getenv("ADEMA_ENV_FILE", "/etc/adema/web_panel.env")
 DELETE_CONFIRM_TEXT = (os.getenv("ADEMA_DELETE_CONFIRM_TEXT", "BORRAR TENANT") or "BORRAR TENANT").strip()
 MONITOR_ENV_PATH = Path(os.getenv("MONITOR_ENV_FILE", str(MONITOR_DIR / ".monitor.env"))).resolve()
+NODE_ENV_PATH = Path(os.getenv("ADEMA_NODE_ENV_FILE", "/etc/adema/node.env")).resolve()
 SETUP_DOMAINS_SCRIPT = ROOT_DIR / "monitor" / "setup_domains.sh"
 
-ADEMA_INFRA_DOMAIN = os.getenv("ADEMA_INFRA_DOMAIN", "").strip()
-ADEMA_DEPLOY_DOMAIN = os.getenv("ADEMA_DEPLOY_DOMAIN", "").strip()
+BASE_DOMAIN = os.getenv("BASE_DOMAIN", os.getenv("ADEMA_BASE_DOMAIN", "")).strip()
+MONITOR_DOMAIN = os.getenv("MONITOR_DOMAIN", os.getenv("ADEMA_INFRA_DOMAIN", "")).strip()
+COOLIFY_DOMAIN = os.getenv("COOLIFY_DOMAIN", os.getenv("ADEMA_DEPLOY_DOMAIN", "")).strip()
+ADEMA_INFRA_DOMAIN = os.getenv("ADEMA_INFRA_DOMAIN", MONITOR_DOMAIN).strip()
+ADEMA_DEPLOY_DOMAIN = os.getenv("ADEMA_DEPLOY_DOMAIN", COOLIFY_DOMAIN).strip()
 
 if not TOKEN:
     raise RuntimeError("ADEMA_WEB_TOKEN no esta definido.")
@@ -100,13 +106,16 @@ def _extract_token() -> str:
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
 
-    return request.args.get("token", "").strip()
+    if ALLOW_QUERY_TOKEN:
+      return request.args.get("token", "").strip()
+
+    return ""
 
 
 @app.before_request
 def validate_token() -> Optional[Response]:
   # Recursos publicos sin datos sensibles.
-  if request.path in ["/", "/favicon.ico", "/robots.txt"] or request.path.startswith("/static/"):
+  if request.path in ["/", "/favicon.ico", "/robots.txt", "/healthz"] or request.path.startswith("/static/"):
         return None
 
   provided = _extract_token()
@@ -327,13 +336,13 @@ def _generate_db_password() -> str:
     return secrets.token_urlsafe(18).replace("-", "A").replace("_", "B")[:24]
 
 
-def _load_monitor_env_values() -> Dict[str, str]:
+def _load_key_value_file(path: Path) -> Dict[str, str]:
   values: Dict[str, str] = {}
-  if not MONITOR_ENV_PATH.is_file():
+  if not path.is_file():
     return values
 
   try:
-    lines = MONITOR_ENV_PATH.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
   except OSError:
     return values
 
@@ -353,6 +362,30 @@ def _load_monitor_env_values() -> Dict[str, str]:
 
     values[key] = value
 
+  return values
+
+
+def _load_monitor_env_values() -> Dict[str, str]:
+  monitor_values = _load_key_value_file(MONITOR_ENV_PATH)
+  node_values = _load_key_value_file(NODE_ENV_PATH)
+
+  values = dict(monitor_values)
+  for key in [
+    "ADEMA_NODE_ID",
+    "ADEMA_NODE_UUID",
+    "ADEMA_NODE_NAME",
+    "CLUSTER_ID",
+    "PROJECT_CODE",
+    "ADEMA_BASE_DOMAIN",
+    "ADEMA_INFRA_DOMAIN",
+    "ADEMA_DEPLOY_DOMAIN",
+    "BACKUP_REMOTE",
+  ]:
+    if node_values.get(key):
+      values[key] = node_values[key]
+
+  if node_values.get("ADEMA_BASE_DOMAIN"):
+    values["BASE_DOMAIN"] = node_values["ADEMA_BASE_DOMAIN"]
   return values
 
 
@@ -390,19 +423,34 @@ def _build_connection_bundle(client_id: str, db_password: str) -> Dict[str, str]
   db_name_prefix = env_values.get("DB_NAME_PREFIX") or f"{db_prefix}_db"
   db_user_prefix = env_values.get("DB_USER_PREFIX") or f"user_{db_prefix}"
   db_port = (env_values.get("DB_PORT") or "5432").strip() or "5432"
+  volume_base_path = env_values.get("VOLUME_BASE_PATH") or "/var/lib/docker/volumes"
+  volume_prefix = env_values.get("VOLUME_PREFIX") or db_prefix
+  base_domain = env_values.get("BASE_DOMAIN") or env_values.get("ADEMA_BASE_DOMAIN") or ""
 
   db_host = _detect_docker0_ip()
   if not db_host:
     db_host = (env_values.get("DB_HOST") or "").strip() or "127.0.0.1"
+
+  db_name = f"{db_name_prefix}_{client_id}"
+  db_user = f"{db_user_prefix}_{client_id}"
+  volume_ns = f"{volume_prefix}_{client_id}"
+  encoded_user = urllib.parse.quote(db_user, safe="")
+  encoded_password = urllib.parse.quote(db_password, safe="")
+  encoded_db = urllib.parse.quote(db_name, safe="")
 
   return {
     "project_code": project_code,
     "client_id": client_id,
     "db_host": db_host,
     "db_port": db_port,
-    "db_name": f"{db_name_prefix}_{client_id}",
-    "db_user": f"{db_user_prefix}_{client_id}",
+    "db_name": db_name,
+    "db_user": db_user,
     "db_password": db_password,
+    "database_url": f"postgresql://{encoded_user}:{encoded_password}@{db_host}:{db_port}/{encoded_db}",
+    "django_allowed_hosts": f"{client_id}.{base_domain}" if base_domain else "",
+    "media_path": f"{volume_base_path}/{volume_ns}_media",
+    "logs_path": f"{volume_base_path}/{volume_ns}_logs",
+    "license_path": f"{volume_base_path}/{volume_ns}_license",
   }
 
 
@@ -793,7 +841,7 @@ def index() -> Response:
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <article class="panel metric-card p-3">
-            <h3 class="metric-label">Infra</h3>
+            <h3 class="metric-label">Monitor</h3>
             <p id="domInfraDomain" class="metric-value text-sm" style="overflow-wrap:anywhere">-</p>
           </article>
           <article class="panel metric-card p-3">
@@ -811,7 +859,7 @@ def index() -> Response:
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <article class="panel metric-card p-3">
-            <h3 class="metric-label">DNS infra</h3>
+            <h3 class="metric-label">DNS monitor</h3>
             <p id="domDnsInfra" class="metric-value text-sm">-</p>
           </article>
           <article class="panel metric-card p-3">
@@ -827,7 +875,7 @@ def index() -> Response:
             <p id="domProxyMode" class="metric-value text-sm">-</p>
           </article>
         </div>
-        <p id="domainStatusNote" class="muted text-xs">Haz click en &ldquo;Verificar estado&rdquo; para revisar DNS, firewall y panel local.</p>
+        <p id="domainStatusNote" class="muted text-xs">Haz click en &ldquo;Verificar estado&rdquo; para revisar DNS, firewall, Coolify/Traefik y puertos internos.</p>
       </section>
 
       <section class="panel p-5 space-y-4">
@@ -969,6 +1017,11 @@ def index() -> Response:
         `DB_NAME=${bundle.db_name || ""}`,
         `DB_USER=${bundle.db_user || ""}`,
         `DB_PASSWORD=${bundle.db_password || ""}`,
+        `DATABASE_URL=${bundle.database_url || ""}`,
+        `DJANGO_ALLOWED_HOSTS=${bundle.django_allowed_hosts || ""}`,
+        `MEDIA_PATH=${bundle.media_path || ""}`,
+        `LOGS_PATH=${bundle.logs_path || ""}`,
+        `LICENSE_PATH=${bundle.license_path || ""}`,
       ].join("\\n");
     }
 
@@ -1376,16 +1429,16 @@ def index() -> Response:
       try {
         const data = await api('/api/domain/status');
 
-        document.getElementById('domInfraDomain').textContent  = data.infra_domain  || '-';
+        document.getElementById('domInfraDomain').textContent  = data.monitor_domain || data.infra_domain || '-';
         document.getElementById('domDeployDomain').textContent = data.deploy_domain || '-';
         document.getElementById('domServerIp').textContent     = data.server_ip     || '-';
 
         const panelOk = data.panel?.responding === true;
         document.getElementById('domPanelStatus').innerHTML = domBadge(panelOk, 'Activo', 'Sin respuesta');
 
-        const dnsInfraOk   = data.dns?.infra_points_to_server  === true;
+        const dnsInfraOk   = (data.dns?.monitor_points_to_server ?? data.dns?.infra_points_to_server) === true;
         const dnsDeployOk  = data.dns?.deploy_points_to_server === true;
-        const dnsInfraProxy  = data.dns?.infra_via_proxy  === true;
+        const dnsInfraProxy  = (data.dns?.monitor_via_proxy ?? data.dns?.infra_via_proxy) === true;
         const dnsDeployProxy = data.dns?.deploy_via_proxy === true;
         const dnsInfraLabel  = dnsInfraOk  ? 'OK' : (dnsInfraProxy  ? 'OK (vía CDN)' : 'Pendiente');
         const dnsDeployLabel = dnsDeployOk ? 'OK' : (dnsDeployProxy ? 'OK (vía CDN)' : 'Pendiente');
@@ -1398,14 +1451,20 @@ def index() -> Response:
         document.getElementById('domFirewallHttp').innerHTML = domBadge(httpOk && httpsOk, fwLabel, fwLabel);
 
         const proxy = data.proxy?.detected || '';
-        const proxyLabels = { coolify: 'Coolify (Modo B)', caddy: 'Caddy (Modo B)', nginx: 'Nginx (Modo A)', free: 'Libre (Modo A)' };
+        const proxyLabels = {
+          'coolify-traefik': 'Coolify/Traefik',
+          coolify: 'Coolify/Traefik',
+          caddy: 'Caddy (no recomendado)',
+          nginx: 'Nginx host activo',
+          free: '80/443 libres'
+        };
         const proxyLabel  = proxyLabels[proxy] || (proxy || '-');
-        const proxyOk     = proxy === 'coolify' || proxy === 'nginx' || proxy === 'caddy';
+        const proxyOk     = data.proxy?.ok === true || proxy === 'coolify-traefik' || proxy === 'coolify';
         document.getElementById('domProxyMode').innerHTML = domBadge(proxyOk, proxyLabel, proxyLabel);
 
         note.textContent = data.ok
-          ? 'Todo en orden. El nodo esta listo para operar por dominio.'
-          : 'Algunos items necesitan atencion. Consulta docs/09-domain-setup.md.';
+          ? 'Nodo listo: Cloudflare DNS -> Coolify/Traefik -> apps.'
+          : 'Requiere accion. Revisar UFW, Coolify/Traefik, Nginx host y puertos internos.';
 
         const lastCheckEl = document.getElementById('domainLastCheck');
         lastCheckEl.textContent = `Ultima verificacion: ${new Date().toLocaleTimeString('es-AR')}`;
@@ -1428,10 +1487,8 @@ def index() -> Response:
 
     document.getElementById('checkDomainsBtn').addEventListener('click', refreshDomainStatus);
 
-    // Auto-login si hay token guardado o en la URL
-    const tokenFromQuery = new URLSearchParams(window.location.search).get("token");
-    if (tokenFromQuery) {
-      setToken(tokenFromQuery);
+    // Auto-login solo desde almacenamiento local. Token por query string queda deshabilitado por seguridad.
+    if (new URLSearchParams(window.location.search).get("token")) {
       window.history.replaceState({}, '', window.location.pathname);
     }
     const storedToken = getToken();
@@ -1453,6 +1510,11 @@ def api_health() -> Response:
         return jsonify(snapshot)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.get("/healthz")
+def healthz() -> Response:
+    return jsonify({"ok": True, "service": "adema-monitor"})
 
 
 @app.get("/api/auth/check")
@@ -1564,7 +1626,7 @@ def api_delete_tenant_permanent() -> Response:
     if not _can_run_delete_without_password():
         return jsonify(
             {
-                "error": "Permisos incompletos para borrar tenant. Ejecuta una vez: sudo bash /home/adema/monitor/setup_web_panel.sh",
+                "error": "Permisos incompletos para borrar tenant. Ejecuta una vez: sudo bash /opt/adema-node/setup_web_panel.sh",
                 "error_code": "delete_sudoers_missing",
             }
         ), 503
@@ -1705,10 +1767,19 @@ def api_domain_status() -> Response:
         }), 404
 
     env = dict(os.environ)
+    if BASE_DOMAIN:
+        env["BASE_DOMAIN"] = BASE_DOMAIN
     if ADEMA_INFRA_DOMAIN:
         env["ADEMA_INFRA_DOMAIN"] = ADEMA_INFRA_DOMAIN
     if ADEMA_DEPLOY_DOMAIN:
         env["ADEMA_DEPLOY_DOMAIN"] = ADEMA_DEPLOY_DOMAIN
+    if MONITOR_DOMAIN:
+        env["MONITOR_DOMAIN"] = MONITOR_DOMAIN
+        env["ADEMA_INFRA_DOMAIN"] = MONITOR_DOMAIN
+    if COOLIFY_DOMAIN:
+        env["COOLIFY_DOMAIN"] = COOLIFY_DOMAIN
+        env["ADEMA_DEPLOY_DOMAIN"] = COOLIFY_DOMAIN
+    env["PUBLIC_PROXY_MODE"] = "coolify-traefik"
 
     try:
         result = run(
@@ -1717,11 +1788,11 @@ def api_domain_status() -> Response:
             capture_output=True,
             text=True,
             check=False,
-            timeout=20,
+            timeout=45,
             env=env,
         )
     except TimeoutExpired:
-        return jsonify({"ok": False, "error": "timeout", "message": "El chequeo de dominios tardo demasiado (>20s)."}), 504
+        return jsonify({"ok": False, "error": "timeout", "message": "El chequeo de dominios tardo demasiado (>45s)."}), 504
     except OSError as exc:
         return jsonify({"ok": False, "error": "exec_error", "message": str(exc)}), 500
 
